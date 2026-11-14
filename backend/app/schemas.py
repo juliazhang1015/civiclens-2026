@@ -35,3 +35,17 @@ class DecisionAnalysis(StrictModel):
     potential_tradeoffs: list[Finding]
     participation: list[Finding]
     unknowns: list[str]
+
+
+class MergedSelection(StrictModel):
+    """What the model returns when combining the parts of a long document: ids of
+    statements already checked against the PDF, plus one newly written summary."""
+    summary: str
+    summary_sources: list[int]
+    key_facts: list[int]
+    proposed_changes: list[int]
+    affected_groups: list[int]
+    potential_benefits: list[int]
+    potential_tradeoffs: list[int]
+    participation: list[int]
+    unknowns: list[str]

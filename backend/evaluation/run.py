@@ -88,7 +88,7 @@ def render_report(records: list[dict], run: dict) -> str:
              "| --- | --- | --- | --- | --- | --- | --- |"]
     for r in records:
         analysis = r.get("analysis")
-        statements = 1 + sum(len(analysis[c]) for c in FINDING_CATEGORIES) if analysis else 0
+        statements = 1 + sum(len(analysis[c]) for c in ("key_facts", *FINDING_CATEGORIES)) if analysis else 0
         passed = f"{sum(ok for _, ok in r['checks'])}/{len(r['checks'])}" if r["checks"] else "–"
         lines.append(f"| {r['id']} | {r['status']} | {r['pages']} | {r['seconds']:.0f} s | {statements} | "
                      f"{r['unmatched_quotes']} | {passed} |")

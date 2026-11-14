@@ -122,3 +122,36 @@ def test_undated_quotes_fall_back_to_wording():
     kept = analysis_with_participation("Delegations may register with the City Clerk.")
     filter_historical_participation(kept, today=TODAY)
     assert len(kept.participation) == 1
+
+
+# --- A passed date must not hide a step that may still be open --------------
+
+@pytest.mark.parametrize("quote", [
+    "Report dated October 26, 2026. Written comments will be accepted until December 15.",   # no year
+    "Notice issued October 1, 2026. Submit comments by 12/15/2026.",                           # numeric date
+    "Notice of October 5, 2026: the survey is open November 1-30, 2026.",                      # day range
+    "The online survey opened on November 1, 2026 and remains open.",                          # started, not ended
+    "Since September 14, 2026, residents can submit comments to the Clerk at any time.",
+])
+def test_passed_date_beside_a_possibly_live_step_is_kept(quote):
+    result = analysis_with_participation(quote)
+    filter_historical_participation(result, today=TODAY)
+    assert len(result.participation) == 1
+
+
+def test_undated_second_quote_keeps_the_step():
+    result = analysis_with_participation("Council Date: November 2, 2026")
+    result.participation[0].evidence.append(
+        Evidence(page=3, quote="A public meeting will be held on Monday, December 7 at 7 p.m. in Council Chambers."))
+    filter_historical_participation(result, today=TODAY)
+    assert len(result.participation) == 1
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("the survey is open November 1-30, 2026", [date(2026, 11, 30)]),        # a range ends on its last day
+    ("PUBLIC MEETING: JANUARY 15, 2024 AT 7 PM", [date(2024, 1, 15)]),
+    ("Comments are welcome in May. 2025 saw record turnout.", []),           # sentence end, not "May 2025"
+    ("held Sept. 9, 2025", [date(2025, 9, 9)]),
+])
+def test_extract_dates_edge_cases(text, expected):
+    assert extract_dates(text) == expected

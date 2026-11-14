@@ -8,7 +8,7 @@ from openai import AsyncOpenAI
 from pydantic import ValidationError
 from app import analyzer
 from app.main import app
-from app.pdf_reader import extract_pages, PdfError
+from app.pdf_reader import MAX_PAGES, extract_pages, PdfError
 from app.schemas import DecisionAnalysis
 
 
@@ -91,7 +91,7 @@ def test_missing_key(monkeypatch):
 @pytest.mark.parametrize("kind", ["scanned", "encrypted", "too_many_pages", "oversize"])
 def test_pdf_limits(kind):
     with fitz.open() as pdf:
-        for _ in range(26 if kind == "too_many_pages" else 1):
+        for _ in range(MAX_PAGES + 1 if kind == "too_many_pages" else 1):
             pdf.new_page()
         data = pdf.tobytes(encryption=fitz.PDF_ENCRYPT_AES_256, owner_pw="owner", user_pw="password") if kind == "encrypted" else pdf.tobytes()
     if kind == "oversize":

@@ -9,8 +9,9 @@ type Decision = {
   potential_benefits: Finding[]; potential_tradeoffs: Finding[]; participation: Finding[]; unknowns: string[]
 }
 const categories = ['proposed_changes', 'affected_groups', 'potential_benefits', 'potential_tradeoffs', 'participation'] as const
-// Must stay above the backend's longest model wait (OLLAMA_TIMEOUT_SECONDS, default 240) so its own error arrives first.
-const ANALYSIS_TIMEOUT_MS = 270_000
+// A long PDF is analyzed in up to 12 parts, one model call each; a local model takes about a minute per part.
+// A single call still fails on the backend after OLLAMA_TIMEOUT_SECONDS (default 240).
+const ANALYSIS_TIMEOUT_MS = 15 * 60_000
 function isFinding(value: unknown): value is Finding {
   if (!value || typeof value !== 'object') return false
   const f = value as Finding
@@ -82,9 +83,9 @@ export default function App() {
       <div className="hero"><p className="eyebrow"><span className="status-dot"/> A CLEARER VIEW OF LOCAL CHANGE</p><h1>See the decisions shaping <em>your community.</em></h1><p className="lede">From a lengthy proposal to a clearer picture. Explore what may change, who could be affected, and how to have your say.</p><div className="topic-tags"><span>Transportation</span><span>Housing & zoning</span><span>Public spaces & facilities</span></div></div>
       <div className="workspace"><form id="upload" className="upload-card" onSubmit={handleSubmit} aria-busy={busy}>
         <p className="eyebrow">01 / START WITH THE SOURCE</p><h2>Explore a municipal proposal</h2><p className="muted">Upload an official public document from any municipality.</p>
-        <label className={`drop-area ${busy ? 'disabled' : ''}`}><input aria-label="Choose a municipal PDF" type="file" accept="application/pdf,.pdf" disabled={busy} onChange={e => selectFile(e.target.files?.[0] ?? null)}/><span className="file-icon"><FileUp size={27}/></span><strong>{file?.name ?? 'Choose a PDF document'}</strong><span>{file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB · Ready to analyze` : 'Select a file from your device'}</span><small>Selectable text · Up to 10 MB · Maximum 25 pages</small></label>
+        <label className={`drop-area ${busy ? 'disabled' : ''}`}><input aria-label="Choose a municipal PDF" type="file" accept="application/pdf,.pdf" disabled={busy} onChange={e => selectFile(e.target.files?.[0] ?? null)}/><span className="file-icon"><FileUp size={27}/></span><strong>{file?.name ?? 'Choose a PDF document'}</strong><span>{file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB · Ready to analyze` : 'Select a file from your device'}</span><small>Selectable text · Up to 10 MB · Maximum 300 pages</small></label>
         <button className="analyze-button" disabled={!file || busy}>{busy ? <><LoaderCircle className="spin" size={18}/> Analyzing document…</> : <>Explore this proposal <ArrowRight size={18}/></>}</button>
-        {busy && <div className="progress"><p role="status">Reading the document and checking supporting excerpts. This can take a few minutes with a local model.</p><div><span aria-hidden="true">{elapsed}s elapsed</span><button type="button" className="text-button" onClick={() => controller.current?.abort()}>Cancel</button></div></div>}
+        {busy && <div className="progress"><p role="status">Reading the document and checking supporting excerpts. Long documents are read in parts and can take several minutes.</p><div><span aria-hidden="true">{elapsed}s elapsed</span><button type="button" className="text-button" onClick={() => controller.current?.abort()}>Cancel</button></div></div>}
         <p className="privacy"><ShieldCheck size={15}/> Public documents only. Extracted text is sent to an AI service for analysis.</p>
       </form><aside id="how-it-works" className="guide"><p className="eyebrow">FROM DOCUMENT TO UNDERSTANDING</p><h2>A source you can check.<br/>A decision you can explore.</h2><ol><li><strong>Bring the original</strong><p>A public proposal, planning notice, or staff report.</p></li><li><strong>Explore the details</strong><p>Changes, affected groups, possible benefits, and trade-offs.</p></li><li><strong>Check the evidence</strong><p>Follow page references back to your PDF before taking action.</p></li></ol><p className="guide-note">Built for different communities and proposal types. No account needed.</p></aside></div>
       {error && <div className="error" role="alert"><AlertCircle size={18}/><span>{error}</span></div>}

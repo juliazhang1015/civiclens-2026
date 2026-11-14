@@ -25,6 +25,12 @@ DecisionAnalysis includes document_title, summary, proposed_changes, affected_gr
 - **Server-side API key:** avoids shipping secrets to browsers.
 - **Municipality-agnostic fields:** makes the same pipeline usable with different city documents without writing one-off policy logic.
 
+## Long documents
+
+A PDF that does not fit one model request is split by page into parts; pages are never cut, so each quote still belongs to one page. Every part is analyzed with the normal prompt and its quotes are checked against the PDF. A final model call sees only the checked statements, numbered, and returns the numbers to keep plus a newly written summary that cites them. The result is assembled in code from those numbers, so the merge step can choose and order statements but cannot change or invent one. If a part fails, the rest are kept and the missing pages are named under "What remains uncertain"; if the merge call fails, the statements are combined in rank order.
+
+Trade-off: a point that depends on pages in different parts can be missed, and a local model needs roughly a minute per part.
+
 ## Scaling later
 
 Add ingestion adapters per city (official agenda/PDF URLs), a document store, human review, scheduled refreshes, and filtering by region. Validate policy-specific claims against authoritative sources before publication.

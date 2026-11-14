@@ -8,7 +8,7 @@
 
 ## Functional requirements
 
-- FR-01: Accept a text-based municipal PDF (<= 10 MB, <= 25 pages).
+- FR-01: Accept a text-based municipal PDF (<= 10 MB, <= 300 pages, at most 12 model-sized parts).
 - FR-02: Extract text with preserved 1-based page references.
 - FR-03: Return a neutral, concise description of a proposal.
 - FR-04: Explain potential changes, groups affected, benefits and trade-offs.

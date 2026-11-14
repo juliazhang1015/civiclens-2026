@@ -49,8 +49,14 @@ It writes `eval_results/<time>-<model>/report.md` (not committed): time, stateme
 | Date | Document | Model | Observed | Cause | Fix |
 | --- | --- | --- | --- | --- | --- |
 | 2026-11-14 | waterloo-lease-2025 | mistral-nemo | Whole analysis rejected (422) | Model ended verbatim quotes with `...` | Quote matcher ignores a leading or trailing ellipsis (#8) |
-| 2026-11-14 | waterloo-lease-2025 | mistral-nemo | In-kind lease and utility contribution (page 2) not mentioned | Open | Open |
-| 2026-11-14 | waterloo-lease-2025 | mistral-nemo | Uncertainty "Future status of the consultation process" although the report describes no consultation | Open | Open |
+| 2026-11-14 | waterloo-lease-2025 | mistral-nemo | In-kind lease and utility contribution (page 2) not mentioned | Prompt did not ask for financial sections | Prompt asks for amounts, who pays and specific open questions. **Not reliably fixed:** raised as an open question in one run, missing again in the next |
+| 2026-11-14 | waterloo-lease-2025 | mistral-nemo | Uncertainty "Future status of the consultation process" although the report describes no consultation | Prompt allowed generic unknowns | Prompt asks for specific questions only; not seen in the next run |
+| 2026-11-14 | waterloo-lease-2025 | mistral-nemo | Lease from January 1, 2026 to December 31, 2028 described as "two years and six months", later "two years" | Model does date arithmetic wrongly; the quote matches, so verification cannot catch it | Prompt forbids calculating durations. **Still occurs.** Needs a stronger model or a check on durations |
+| 2026-11-14 | waterloo-lease-2025 | mistral-nemo | Lease space listed as a key "amount" | Model misfiled a place | Key facts without a digit are dropped |
+| 2026-11-14 | waterloo-lease-2025 (forced into 2 parts) | mistral-nemo | Merged title "Municipal Document Overview"; same group listed twice; open question from page 2 lost | Merge step never sees the cover page; near-duplicate wording; model returned no open questions | Title taken from the first part; duplicates ignore a leading "the" and final period; open questions fall back to the parts' own |
+| 2026-11-14 | waterloo-lease-2025 (forced into 2 parts) | mistral-nemo | Part 2 analyzed the cover page again and reported nothing from page 2 | The whole first page was repeated in each part as context | Parts get a 300-character header marked as context, and may cite only their own pages |
+| 2026-11-14 | waterloo-lease-2025 | mistral-nemo | Whole analysis rejected (422) | Summary quote joined two real passages with `...` | A joined quote is split into separate excerpts, each checked on the page |
+| 2026-11-14 | waterloo-lease-2025 | mistral-nemo | Lease term filed as a key "amount" | Model picks the wrong kind | Open; the value itself is verbatim |
 
 ## Reliability PR verification
 

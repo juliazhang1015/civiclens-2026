@@ -59,3 +59,19 @@ def test_unknown_provider_rejected(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "unsupported")
     with pytest.raises(RuntimeError, match="AI_PROVIDER"):
         asyncio.run(analyzer.analyze_pages(["An example."]))
+
+
+def test_ollama_not_running_is_reported_as_unreachable(monkeypatch):
+    # The ollama client raises the builtin ConnectionError, not an httpx error.
+    monkeypatch.setenv("AI_PROVIDER", "ollama")
+
+    class DownClient:
+        def __init__(self, host, timeout):
+            pass
+
+        async def chat(self, **kwargs):
+            raise ConnectionError("Failed to connect to Ollama.")
+
+    monkeypatch.setattr(analyzer, "AsyncClient", DownClient)
+    with pytest.raises(RuntimeError, match="Cannot reach Ollama"):
+        asyncio.run(analyzer.analyze_pages(["A zoning change is proposed."]))

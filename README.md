@@ -6,7 +6,7 @@ Built for the 2026 CIVIC Hack. This is a hackathon prototype, **not** an officia
 
 ## What the MVP does
 
-1. Upload a text-based municipal PDF (up to 10 MB / 25 pages).
+1. Upload a text-based municipal PDF (up to 10 MB / 300 pages). Longer documents are analyzed in parts and merged.
 2. Extract the document's text using PyMuPDF.
 3. Analyze it through a strict Pydantic output schema (local Ollama by default; optional OpenAI API).
 4. Display a plain-language summary, potential impacts, participation details, and supporting PDF page references.
@@ -106,6 +106,7 @@ paid provider is intentionally chosen.
 
 The frontend can be on a different laptop than the model computer. See
 [the portable two-computer setup](docs/multi-device-setup.md).
-For a small Mac, keep the supplied 25-page PDF limit and 20,000-character
-local input limit; large original council packets need section extraction
-until chunked analysis is implemented.
+A document longer than one model request (20,000 characters locally) is split
+by page into parts, each part is analyzed, and the checked statements are merged.
+At most 12 parts are accepted, about 80-100 pages for a local model; a whole
+council packet still needs the relevant section extracted first.

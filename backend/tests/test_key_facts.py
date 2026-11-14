@@ -12,7 +12,11 @@ def fact(kind: str, value: str, quote: str, page: int = 1) -> KeyFact:
 
 
 def analysis(*facts: KeyFact) -> DecisionAnalysis:
-    summary = Finding(text="Summary.", evidence=[Evidence(page=1, quote="The project budget is $2.4 million")])
+    return analysis_with_summary("The project budget is $2.4 million", *facts)
+
+
+def analysis_with_summary(summary_quote: str, *facts: KeyFact) -> DecisionAnalysis:
+    summary = Finding(text="Summary.", evidence=[Evidence(page=1, quote=summary_quote)])
     return DecisionAnalysis(document_title="Test", summary=summary, key_facts=list(facts), proposed_changes=[],
                             affected_groups=[], potential_benefits=[], potential_tradeoffs=[], participation=[],
                             unknowns=[])
@@ -53,3 +57,32 @@ def test_dropped_facts_do_not_reject_the_analysis_or_count_as_statements():
 def test_kind_is_restricted():
     with pytest.raises(ValidationError):
         fact("opinion", "$2.4 million", "project budget is $2.4 million")
+
+
+@pytest.mark.parametrize("value,quote", [
+    ("$500", "The grant is $500,000"),
+    ("$12", "total project budget is $12.4 million"),
+    ("2.4 million", "total project budget is $12.4 million"),
+    ("$12.4", "total project budget is $12.4 million"),          # the unit is part of the amount
+    ("March 1", "Comments are due March 15, 2027"),
+    ("5, 2027", "Comments are due March 15, 2027"),
+    ("1", "The fee rises from $1,250 to $1,400 per unit"),
+    ("40", "a 40% increase in fees"),
+])
+def test_value_must_be_the_whole_figure(value, quote):
+    result = analysis_with_summary(quote, fact("amount", value, quote))
+    verify_evidence(result, [quote])
+    assert result.key_facts == []
+
+
+@pytest.mark.parametrize("value,quote", [
+    ("$500,000.", "The grant is $500,000."),                     # stray sentence punctuation
+    ("$12.4 million", "total project budget is $12.4 million, including design"),
+    ("March 15, 2027", "Comments are due March 15, 2027"),
+    ("40%", "a 40% increase in fees"),
+    ("$1,250", "The fee rises from $1,250 to $1,400 per unit"),
+])
+def test_whole_figures_pass(value, quote):
+    result = analysis_with_summary(quote, fact("amount", value, quote))
+    verify_evidence(result, [quote])
+    assert len(result.key_facts) == 1
