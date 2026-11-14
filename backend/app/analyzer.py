@@ -65,12 +65,15 @@ FINDING_CATEGORIES = ("proposed_changes", "affected_groups", "potential_benefits
 # Models often mark where they cut a quote short. Only at the ends: an ellipsis
 # in the middle could hide skipped words such as "not".
 EDGE_ELLIPSIS = re.compile(r"^(?:\s*\.{3,})+|(?:\.{3,}\s*)+$")
+# A soft hyphen the model copied together with its line break (as a newline or a space).
+COPIED_SOFT_BREAK = re.compile(rf"(?<={LETTER})­\s+(?={LETTER})")
 
 
 def normalize_quote(text: str) -> str:
     # Ignore layout whitespace, Unicode ligatures and quote/dash styles.
     text = unicodedata.normalize("NFKC", text).replace(WORD_BREAK, "")
-    return " ".join(EDGE_ELLIPSIS.sub("", text).translate(TYPOGRAPHY).split())
+    text = COPIED_SOFT_BREAK.sub("", EDGE_ELLIPSIS.sub("", text))
+    return " ".join(text.translate(TYPOGRAPHY).split())
 
 
 def normalize_page(page: str) -> str:
@@ -99,7 +102,8 @@ def quote_is_on_page(ev: Evidence, normalized_pages: list[str]) -> bool:
     if not quote or not 1 <= ev.page <= len(normalized_pages):
         return False
     page = normalized_pages[ev.page - 1]
-    return quote in page or bool(WORD_BREAK in page and quote_pattern(quote).search(page))
+    # The pattern also covers a hyphen copied with its line break ("1- 5" for "1-5").
+    return quote in page or bool(quote_pattern(quote).search(page))
 
 
 def verify_evidence(result: DecisionAnalysis, pages: list[str]) -> int:

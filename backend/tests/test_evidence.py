@@ -34,7 +34,13 @@ def analysis(summary_quote: str = SUMMARY_QUOTE, **categories: list[Finding]) ->
     ("costs — if approved — rise", "costs —\nif approved — rise"),  # spaced dash at a line end
     ("increase of 5 - 10 percent", "increase of 5 -\n10 percent"),
     ("items: - parking - transit", "items:\n- parking -\n transit"),  # bullet dashes
-    ("seek to enter into a new lease agreement...", "seek to enter into a new lease agreement, under"),  # model marks a cut
+    # The model copies the source line break itself, as a newline or as a space.
+    ("pages 1-\n5 of the plan", "pages 1-\n5 of the plan"),
+    ("pages 1- 5 of the plan", "pages 1-\n5 of the plan"),
+    ("the develop-\nment will", "the develop-\nment will"),
+    ("the develop­\nment will", "the develop­\nment will"),
+    ("the develop­ ment will", "the develop­\nment will"),
+    ("seek to enter into a new lease agreement...","seek to enter into a new lease agreement, under"),  # model marks a cut
     ("… a new lease agreement …", "seek to enter into a new lease agreement, under"),
 ])
 def test_typographic_variants_still_match(model_quote, pdf_text):
