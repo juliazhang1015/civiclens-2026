@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import re
 import unicodedata
@@ -8,9 +9,10 @@ from dotenv import load_dotenv
 from ollama import AsyncClient, ResponseError
 from openai import AsyncOpenAI
 
-from .schemas import DecisionAnalysis
+from .schemas import DecisionAnalysis, Evidence, Finding
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 MAX_TEXT_CHARS = 100_000
 DEFAULT_LOCAL_TEXT_CHARS = 20_000
@@ -40,21 +42,101 @@ Return concise neutral, accessible English. Do not invent citations.
 """
 
 
+# Typographic variants a model commonly rewrites as ASCII. Wording, digits and
+# the presence of punctuation are never ignored.
+TYPOGRAPHY = str.maketrans({
+    "‘": "'", "’": "'", "‚": "'", "‛": "'",
+    "“": '"', "”": '"', "„": '"', "‟": '"',
+    "‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-",
+    "­": None,  # soft hyphen
+})
+LETTER = r"[^\W\d_]"
+# A hyphen between two letters at a line end is either a split word
+# ("develop-ment") or a real hyphen ("long-term"); the PDF text cannot say
+# which, so it becomes a marker that a quote may match either way.
+WORD_BREAK = "\x00"
+WORD_BREAK_HYPHEN = re.compile(rf"(?<={LETTER})[-‐­][ \t]*\n\s*(?={LETTER})")
+# Between digits it is always a real separator: "1-\n5" is never "15".
+NUMBER_BREAK_HYPHEN = re.compile(r"(?<=\d)([-‐‒–])[ \t]*\n\s*(?=\d)")
+FINDING_CATEGORIES = ("proposed_changes", "affected_groups", "potential_benefits",
+                      "potential_tradeoffs", "participation")
+
+
+# Models often mark where they cut a quote short. Only at the ends: an ellipsis
+# in the middle could hide skipped words such as "not".
+EDGE_ELLIPSIS = re.compile(r"^(?:\s*\.{3,})+|(?:\.{3,}\s*)+$")
+# A soft hyphen the model copied together with its line break (as a newline or a space).
+COPIED_SOFT_BREAK = re.compile(rf"(?<={LETTER})­\s+(?={LETTER})")
+
+
 def normalize_quote(text: str) -> str:
-    # Ignore layout whitespace and Unicode ligatures, never wording or punctuation.
-    return " ".join(unicodedata.normalize("NFKC", text).split())
+    # Ignore layout whitespace, Unicode ligatures and quote/dash styles.
+    text = unicodedata.normalize("NFKC", text).replace(WORD_BREAK, "")
+    text = COPIED_SOFT_BREAK.sub("", EDGE_ELLIPSIS.sub("", text))
+    return " ".join(text.translate(TYPOGRAPHY).split())
 
 
-def verify_evidence(result: DecisionAnalysis, pages: list[str]) -> None:
-    findings = [result.summary, *result.proposed_changes, *result.affected_groups,
-                *result.potential_benefits, *result.potential_tradeoffs, *result.participation]
-    for item in findings:
-        if not item.evidence:
-            raise ValueError("An extracted claim has no supporting page quote.")
-        for ev in item.evidence:
-            if (not normalize_quote(ev.quote) or not 1 <= ev.page <= len(pages)
-                    or normalize_quote(ev.quote) not in normalize_quote(pages[ev.page - 1])):
-                raise ValueError("AI returned a quote that could not be matched to the source PDF.")
+def normalize_page(page: str) -> str:
+    page = unicodedata.normalize("NFKC", page).replace(WORD_BREAK, "")
+    page = NUMBER_BREAK_HYPHEN.sub(r"\1", WORD_BREAK_HYPHEN.sub(WORD_BREAK, page))
+    return " ".join(page.translate(TYPOGRAPHY).split())
+
+
+def quote_pattern(quote: str) -> re.Pattern[str]:
+    parts = []
+    for index, char in enumerate(quote):
+        if char == " " and index and quote[index - 1] == "-":
+            continue  # already consumed by the hyphen below
+        if char == "-":
+            # A real hyphen, a hyphen the model copied with its line break, or a word break.
+            parts.append(rf"(?:- ?|{WORD_BREAK})" if quote[index + 1:index + 2] == " " else rf"(?:-|{WORD_BREAK})")
+        elif char.isalpha():
+            parts.append(re.escape(char) + f"{WORD_BREAK}?")
+        else:
+            parts.append(re.escape(char))
+    return re.compile("".join(parts))
+
+
+def quote_is_on_page(ev: Evidence, normalized_pages: list[str]) -> bool:
+    quote = normalize_quote(ev.quote)
+    if not quote or not 1 <= ev.page <= len(normalized_pages):
+        return False
+    page = normalized_pages[ev.page - 1]
+    # The pattern also covers a hyphen copied with its line break ("1- 5" for "1-5").
+    return quote in page or bool(quote_pattern(quote).search(page))
+
+
+def verify_evidence(result: DecisionAnalysis, pages: list[str]) -> int:
+    """Keep only quotes found on their cited page; drop findings left with none.
+
+    Returns the number of findings dropped. Raises if the summary itself is
+    unsupported, because the analysis has no trustworthy headline without it.
+    """
+    normalized_pages = [normalize_page(page) for page in pages]
+
+    def supported(finding: Finding) -> bool:
+        matched = [ev for ev in finding.evidence if quote_is_on_page(ev, normalized_pages)]
+        for ev in finding.evidence:
+            if ev not in matched:
+                logger.warning("Unmatched quote on page %s: %r", ev.page, ev.quote[:200])
+        finding.evidence = matched
+        return bool(matched)
+
+    if not supported(result.summary):
+        raise ValueError("AI returned a summary quote that could not be matched to the source PDF.")
+
+    dropped = 0
+    for category in FINDING_CATEGORIES:
+        findings = getattr(result, category)
+        kept = [finding for finding in findings if supported(finding)]
+        dropped += len(findings) - len(kept)
+        setattr(result, category, kept)
+    if dropped:
+        result.unknowns.append(
+            f"{dropped} AI-generated statement{'s were' if dropped > 1 else ' was'} removed because "
+            "the supporting quote could not be found in the PDF."
+        )
+    return dropped
 
 
 # Conservative guard for explicitly completed outreach misclassified as next steps.
