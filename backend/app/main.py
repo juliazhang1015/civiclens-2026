@@ -1,5 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+from openai import APIConnectionError, APIStatusError, APITimeoutError, AuthenticationError, RateLimitError
 
 from .pdf_reader import MAX_FILE_SIZE, extract_pages, PdfError
 from .analyzer import analyze_pages
@@ -20,10 +22,18 @@ async def analyze(file: UploadFile = File(...)):
     content = await file.read(MAX_FILE_SIZE + 1)
     await file.close()
     try:
-        pages = extract_pages(content)
+        pages = await run_in_threadpool(extract_pages, content)
         return await analyze_pages(pages)
     except PdfError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (TimeoutError, APITimeoutError):
+        raise HTTPException(status_code=504, detail="Analysis timed out. Please retry with a shorter PDF.")
+    except AuthenticationError:
+        raise HTTPException(status_code=503, detail="The analysis service credentials need attention. Contact the demo team.")
+    except RateLimitError:
+        raise HTTPException(status_code=503, detail="The analysis service is busy or its quota is exhausted. Please try again later.")
+    except (APIConnectionError, APIStatusError):
+        raise HTTPException(status_code=503, detail="The analysis provider is unavailable. Please try again later.")
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception:

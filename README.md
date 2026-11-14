@@ -8,7 +8,7 @@ Built for the 2026 CIVIC Hack. This is a hackathon prototype, **not** an officia
 
 1. Upload a text-based municipal PDF (up to 10 MB / 25 pages).
 2. Extract the document's text using PyMuPDF.
-3. Analyze it through a structured AI prompt (when an API key is configured).
+3. Analyze it through a strict Pydantic output schema (when an API key is configured).
 4. Display a plain-language summary, potential impacts, participation details, and supporting PDF page references.
 5. Identify missing or unverified information rather than inventing it.
 
@@ -47,7 +47,7 @@ Open another terminal:
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -88,3 +88,9 @@ Create branches from main (feature/frontend, feature/ai-analysis, feature/backen
 ## License
 
 No software license has been selected yet. Agree on a license with the team before adding one.
+
+## Demo readiness
+
+See [the audit and 36-hour plan](docs/hackathon-plan.md) for priorities, roles, demo script and remaining live validation. Text above 100,000 extracted characters is rejected rather than silently truncated. Quote matching checks source presence, not correctness of interpretation.
+
+For a local demo use both servers above. Production hosting must forward `/api/*` to FastAPI with the `/api` prefix removed; Vite’s development proxy is not part of a static build.
