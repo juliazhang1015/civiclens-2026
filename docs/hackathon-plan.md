@@ -30,10 +30,10 @@ The React / FastAPI / PyMuPDF / model-API architecture is appropriate for this s
 
 | Hours | Owner | Deliverable / exit criterion |
 | --- | --- | --- |
-| 0–4 | Julia + backend teammate | Review and integrate reliability PR; both servers start; CI passes |
-| 4–10 | Julia (AI) + testing teammate | Run three official PDFs: transportation, zoning, public facilities. Record URL, page count, result, latency and every citation check |
-| 10–18 | Julia (frontend) + backend teammate | Resolve issues from real PDFs, test mobile and keyboard flow; establish demo machine/network/API configuration |
-| 18–26 | Testing + documentation teammates | Adversarial and error checks; source table; screenshots; architecture explanation; evaluate uncertainty and proposal-vs-approval wording |
+| 0–4 | Julia + Eric | Review and integrate reliability PR; both servers start; CI passes |
+| 4–10 | Julia (AI) + Hanson | Run three official PDFs: transportation, zoning, public facilities. Record URL, page count, result, latency and every citation check |
+| 10–18 | Julia (frontend) + Eric | Resolve issues from real PDFs, test mobile and keyboard flow; establish demo machine/network/API configuration |
+| 18–26 | Hanson + Zoe | Adversarial and error checks; source table; screenshots; architecture explanation; evaluate uncertainty and proposal-vs-approval wording |
 | 26–32 | Whole team | Rehearse a 3-minute demo with a primary and backup official document; verify quota and internet |
 | 32–36 | Whole team | Feature freeze, fix blockers only, final rehearsal and submission |
 
