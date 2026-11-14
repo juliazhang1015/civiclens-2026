@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
-from openai import APIConnectionError, APIStatusError, APITimeoutError, AuthenticationError, RateLimitError
+from anthropic import APIConnectionError, APIStatusError, APITimeoutError, AuthenticationError, RateLimitError
 
 from .pdf_reader import MAX_FILE_SIZE, extract_pages, PdfError
 from .analyzer import analyze_pages, InputSizeError

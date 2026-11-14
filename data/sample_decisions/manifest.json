@@ -1,0 +1,44 @@
+{
+  "documents": [
+    {
+      "id": "waterloo-lease-2025",
+      "title": "404 K-W Wing (RCAFA) Lease Agreement, staff report COM2025-032",
+      "municipality": "City of Waterloo",
+      "category": "public facilities",
+      "url": "https://www.waterloo.ca/media/cykl4t0i/council-meeting-packet-december-1-2025.pdf",
+      "source_note": "Accessed 2026-11-14. Pages 19-20 of the December 1, 2025 Council meeting packet.",
+      "file": "waterloo_council_packet_2025-12-01.pdf",
+      "expect": {
+        "must_include": [
+          "510 Dutton",
+          "December 31, 2028",
+          "utility"
+        ],
+        "must_not_include": [],
+        "participation_must_be_empty": true
+      },
+      "pages": [
+        19,
+        20
+      ]
+    },
+    {
+      "id": "waterloo-council-packet-2025-12-01",
+      "title": "Council meeting packet, December 1, 2025 (217 pages, many agenda items)",
+      "municipality": "City of Waterloo",
+      "category": "long document / whole agenda",
+      "url": "https://www.waterloo.ca/media/cykl4t0i/council-meeting-packet-december-1-2025.pdf",
+      "source_note": "Accessed 2026-11-14. Long-document test: the pipeline is built for one proposal, so a whole packet is a stress case.",
+      "file": "waterloo_council_packet_2025-12-01.pdf",
+      "expect": {
+        "must_include": [
+          "$10,000,000",
+          "December 19, 2025",
+          "510 Dutton"
+        ],
+        "must_not_include": [],
+        "participation_must_be_empty": false
+      }
+    }
+  ]
+}

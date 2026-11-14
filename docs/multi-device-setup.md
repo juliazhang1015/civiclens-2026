@@ -78,7 +78,7 @@ Do not expose port 8000 to the public internet. Ollama itself stays bound to
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
-| `AI_PROVIDER` | `backend/.env` | `ollama` (default) or `openai` |
+| `AI_PROVIDER` | `backend/.env` | `ollama` (default) or `anthropic` |
 | `OLLAMA_MODEL` | `backend/.env` | Local model name, default `qwen3:4b` |
 | `OLLAMA_BASE_URL` | `backend/.env` | Ollama address **as seen by FastAPI** |
 | `OLLAMA_NUM_CTX` | `backend/.env` | Model context budget |
@@ -88,9 +88,11 @@ Do not expose port 8000 to the public internet. Ollama itself stays bound to
 
 ## Limitations
 
-- Existing PDF parser accepts at most **25 pages / 10 MB**, regardless of model host.
+- The PDF parser accepts at most **300 pages / 10 MB**, regardless of model host.
 - Local AI defaults to **20,000 extracted characters** per request, to protect
-  smaller laptops. Longer documents need page selection/chunked processing.
+  smaller laptops. A longer document is split by page into parts (at most
+  `ANALYSIS_MAX_PARTS`, default 12), analyzed one part at a time, and merged.
+  Expect about a minute per part on a laptop.
 - Model-generated citations must still match literal excerpts of uploaded PDF pages.
   This protects against invented quotes but cannot guarantee accurate interpretations.
 - An independent publicly hosted site needs an authenticated backend and dedicated

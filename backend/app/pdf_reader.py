@@ -1,7 +1,8 @@
 import fitz
 
 MAX_FILE_SIZE = 10 * 1024 * 1024
-MAX_PAGES = 25
+# Long documents are analyzed in parts; the analyzer limits how many parts a model may take.
+MAX_PAGES = 300
 
 
 class PdfError(ValueError):

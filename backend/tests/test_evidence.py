@@ -16,7 +16,7 @@ def analysis(summary_quote: str = SUMMARY_QUOTE, **categories: list[Finding]) ->
                                     "potential_tradeoffs", "participation")}
     fields.update(categories)
     return DecisionAnalysis(document_title="Test", summary=finding("Summary.", (1, summary_quote)),
-                            unknowns=[], **fields)
+                            key_facts=[], unknowns=[], **fields)
 
 
 @pytest.mark.parametrize("model_quote,pdf_text", [
@@ -55,7 +55,7 @@ def test_typographic_variants_still_match(model_quote, pdf_text):
     ("fee rises to $1500", "fee rises to $1-\n500"),
     ("the budget is $2.5 million", "the budget is $25 million"),  # punctuation in numbers matters
     ("Council approved the plan", "Council has not approved the plan"),
-    ("Council ... approved the plan", "Council has not approved the plan"),  # no skipping words mid-quote
+    ("A protected cycle lane ... is proposed on Queen Street", "A protected cycle lane is proposed on King Street."),
     ("...", "Any page text."),
 ])
 def test_different_wording_or_numbers_do_not_match(model_quote, pdf_text):
@@ -95,3 +95,30 @@ def test_partly_supported_summary_rejects_the_whole_analysis():
                              (1, SUMMARY_QUOTE), (1, "Parking fees will double"))
     with pytest.raises(ValueError):
         verify_evidence(result, [PAGE])
+
+
+def test_quote_joined_with_an_ellipsis_becomes_separate_excerpts():
+    # Seen live: two real passages from one page joined as "A... B". Shown joined, the
+    # ellipsis could hide a word such as "not"; shown apart, each excerpt is verbatim.
+    page = "The City seeks a new lease agreement, under these terms. Use: Meeting and events venue."
+    joined = finding("A new lease for an events venue.", (1, "The City seeks a new lease agreement... Use: Meeting and events venue"))
+    result = analysis(summary_quote="The City seeks a new lease", proposed_changes=[joined])
+
+    assert verify_evidence(result, [page]) == 0
+    assert [ev.quote for ev in result.proposed_changes[0].evidence] == [
+        "The City seeks a new lease agreement", "Use: Meeting and events venue"]
+
+
+def test_every_piece_of_an_elided_quote_must_be_on_the_page():
+    page = "The City seeks a new lease agreement, under these terms."
+    joined = finding("Statement.", (1, "The City seeks a new lease agreement [...] rent will double next year"))
+    result = analysis(summary_quote="The City seeks a new lease", proposed_changes=[joined])
+    assert verify_evidence(result, [page]) == 1
+
+
+def test_fragments_too_short_to_mean_anything_are_not_kept_as_excerpts():
+    page = "Council has not approved the plan for King Street."
+    joined = finding("Statement.", (1, "Council ... approved the plan for King Street"))
+    result = analysis(summary_quote="Council has not approved the plan", proposed_changes=[joined])
+    verify_evidence(result, [page])
+    assert [ev.quote for ev in result.proposed_changes[0].evidence] == ["approved the plan for King Street"]

@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test'
 const pdf = { name: 'proposal.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-fixture') }
 const finding = { text: 'A cycle lane is proposed.', evidence: [{ page: 1, quote: 'A cycle lane is proposed.' }] }
-const result = { document_title: 'Transportation proposal', summary: finding, proposed_changes: [finding], affected_groups: [], potential_benefits: [], potential_tradeoffs: [], participation: [], unknowns: ['No consultation deadline is stated.'] }
+const fact = { kind: 'amount', label: 'Estimated construction cost', value: '$2.4 million', evidence: [{ page: 1, quote: 'estimated cost of $2.4 million' }] }
+const result = { document_title: 'Transportation proposal', summary: finding, key_facts: [fact], proposed_changes: [finding], affected_groups: [], potential_benefits: [], potential_tradeoffs: [], participation: [], unknowns: ['No consultation deadline is stated.'] }
 
 test('upload, evidence, focus and responsive results', async ({ page }, testInfo) => {
   const errors: string[] = []
@@ -24,6 +25,7 @@ test('upload, evidence, focus and responsive results', async ({ page }, testInfo
   await expect(page.getByRole('heading', { name: result.document_title })).toBeFocused()
   await page.locator('summary').first().click()
   await expect(page.getByRole('link', { name: 'PDF page 1' }).first()).toHaveAttribute('href', /blob:.*#page=1$/)
+  await expect(page.getByText('$2.4 million: Estimated construction cost')).toBeVisible()
   await expect(page.getByText('No consultation deadline is stated.')).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await testInfo.attach('results', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
