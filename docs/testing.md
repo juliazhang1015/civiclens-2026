@@ -64,4 +64,4 @@ It writes `eval_results/<time>-<model>/report.md` (not committed): time, stateme
 - Local TypeScript/Vite production build: **passed**.
 - Browser regression suite: `cd frontend && npm run test:e2e`. Runs desktop and 390px layouts, upload validation, loading lock, evidence links, response validation, error recovery and cancellation. CI uploads screenshots and traces in `browser-test-results`.
 - Local browser launch was blocked by the execution environment; use the PR CI result for browser-suite status.
-- Live OpenAI analysis: **not run**, no API key available. Official transportation, zoning and facility PDFs: **not yet validated**. Synthetic tests are not a substitute for these acceptance checks.
+- Live OpenAI analysis: **not run**, no API key available (the OpenAI provider has since been replaced by Anthropic; see Model evaluation above). Official transportation, zoning and facility PDFs: **not yet validated**. Synthetic tests are not a substitute for these acceptance checks.

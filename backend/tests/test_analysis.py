@@ -1,10 +1,10 @@
 import asyncio
 from unittest.mock import AsyncMock
 import fitz
-import httpx
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
-from openai import AsyncOpenAI
+from anthropic import AsyncAnthropic
 from pydantic import ValidationError
 from app import analyzer
 from app.main import app
@@ -58,14 +58,22 @@ def test_three_categories_through_api_and_sdk(monkeypatch, text, blank_first):
     def respond(request):
         import json
         payload = json.loads(request.content)
-        assert payload["response_format"]["type"] == "json_schema"
-        assert payload["response_format"]["json_schema"]["strict"] is True
-        assert f"[PDF PAGE {len(pages)}]" in payload["messages"][1]["content"]
-        return httpx.Response(200, json={"id": "test", "object": "chat.completion", "created": 0, "model": "gpt-4o-mini",
-            "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": expected.model_dump_json()}}]})
-    monkeypatch.setenv("AI_PROVIDER", "openai")
-    monkeypatch.setenv("OPENAI_API_KEY", "test-only")
-    monkeypatch.setattr(analyzer, "AsyncOpenAI", lambda **kwargs: AsyncOpenAI(**kwargs, http_client=httpx.AsyncClient(transport=httpx.MockTransport(respond))))
+        assert request.headers["x-api-key"] == "test-only"
+        assert payload["model"] == "claude-opus-5-5"
+        assert payload["output_config"]["format"]["type"] == "json_schema"
+        assert payload["output_config"]["format"]["schema"]["additionalProperties"] is False
+        assert payload["output_config"]["effort"] == "medium"
+        assert payload["fallbacks"] == "default" and "server-side-fallback" in request.headers["anthropic-beta"]
+        assert "untrusted SOURCE DATA" in payload["system"]
+        assert f"[PDF PAGE {len(pages)}]" in payload["messages"][0]["content"]
+        return httpx2.Response(200, json={"id": "msg_test", "type": "message", "role": "assistant",
+            "model": "claude-opus-5-5", "content": [{"type": "text", "text": expected.model_dump_json()}],
+            "stop_reason": "end_turn", "stop_sequence": None, "usage": {"input_tokens": 1, "output_tokens": 1}})
+    monkeypatch.setenv("AI_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-only")
+    monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
+    monkeypatch.delenv("ANTHROPIC_EFFORT", raising=False)
+    monkeypatch.setattr(analyzer, "AsyncAnthropic", lambda **kwargs: AsyncAnthropic(**kwargs, http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(respond))))
     response = TestClient(app).post("/analyze", files={"file": ("proposal.pdf", content, "application/pdf")})
     assert response.status_code == 200
     assert response.json()["summary"]["evidence"][0]["page"] == len(pages)
@@ -75,15 +83,17 @@ def test_three_categories_through_api_and_sdk(monkeypatch, text, blank_first):
 
 
 def test_no_silent_truncation(monkeypatch):
-    monkeypatch.setenv("AI_PROVIDER", "openai")
-    monkeypatch.setenv("OPENAI_API_KEY", "test-only")
+    monkeypatch.setenv("AI_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-only")
+    monkeypatch.delenv("ANTHROPIC_MAX_TEXT_CHARS", raising=False)
     with pytest.raises(ValueError, match="too much text"):
         asyncio.run(analyzer.analyze_pages(["a" * (analyzer.MAX_TEXT_CHARS + 1)]))
 
 
 def test_missing_key(monkeypatch):
-    monkeypatch.setenv("AI_PROVIDER", "openai")
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("AI_PROVIDER", "anthropic")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     response = TestClient(app).post("/analyze", files={"file": ("test.pdf", pdf_bytes("Public proposal"), "application/pdf")})
     assert response.status_code == 503
 

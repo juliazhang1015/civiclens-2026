@@ -78,7 +78,7 @@ Do not expose port 8000 to the public internet. Ollama itself stays bound to
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
-| `AI_PROVIDER` | `backend/.env` | `ollama` (default) or `openai` |
+| `AI_PROVIDER` | `backend/.env` | `ollama` (default) or `anthropic` |
 | `OLLAMA_MODEL` | `backend/.env` | Local model name, default `qwen3:4b` |
 | `OLLAMA_BASE_URL` | `backend/.env` | Ollama address **as seen by FastAPI** |
 | `OLLAMA_NUM_CTX` | `backend/.env` | Model context budget |

@@ -11,7 +11,7 @@ from typing import TypeVar
 import httpx
 from dotenv import load_dotenv
 from ollama import AsyncClient, ResponseError
-from openai import APITimeoutError, AsyncOpenAI, ContentFilterFinishReasonError, LengthFinishReasonError
+from anthropic import APITimeoutError, AsyncAnthropic
 from pydantic import BaseModel
 
 from .schemas import DecisionAnalysis, Evidence, Finding, KeyFact, MergedSelection
@@ -20,9 +20,8 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 Reply = TypeVar("Reply", bound=BaseModel)
 
-MAX_TEXT_CHARS = 100_000
+MAX_TEXT_CHARS = 200_000   # per Anthropic request, about 50,000 tokens; longer documents are split
 DEFAULT_LOCAL_TEXT_CHARS = 20_000
-ANALYSIS_TIMEOUT_SECONDS = 75
 
 
 class InputSizeError(ValueError):
@@ -310,8 +309,8 @@ def filter_historical_participation(result: DecisionAnalysis, today: date | None
 
 def ai_provider() -> str:
     provider = os.getenv("AI_PROVIDER", "ollama").strip().lower()
-    if provider not in {"ollama", "openai"}:
-        raise RuntimeError("AI_PROVIDER must be 'ollama' or 'openai'.")
+    if provider not in {"ollama", "anthropic"}:
+        raise RuntimeError("AI_PROVIDER must be 'ollama' or 'anthropic'.")
     return provider
 
 
@@ -345,28 +344,46 @@ async def _ollama_chat(system: str, user: str, schema: type[Reply]) -> Reply:
     return schema.model_validate_json(response.message.content)
 
 
-async def _openai_parse(system: str, user: str, schema: type[Reply]) -> Reply:
-    key = os.getenv("OPENAI_API_KEY")
-    if not key:
-        raise RuntimeError("AI_PROVIDER=openai requires OPENAI_API_KEY in backend/.env.")
+# Models whose safety classifiers can decline a request and that accept a server-side
+# fallback: the API re-runs a declined request on another model inside the same call.
+ANTHROPIC_FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5-2", "claude-fable-5-1"}
 
-    async with AsyncOpenAI(api_key=key, timeout=60.0, max_retries=0) as client:
-        async with asyncio.timeout(ANALYSIS_TIMEOUT_SECONDS):
-            response = await client.beta.chat.completions.parse(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-                response_format=schema,
-                max_tokens=5000,
-                temperature=0,
-            )
-    message = response.choices[0].message
-    if message.refusal or message.parsed is None:
-        raise ValueError("The analysis service could not produce a supported analysis.")
-    return message.parsed
+
+async def _anthropic_parse(system: str, user: str, schema: type[Reply]) -> Reply:
+    model = os.getenv("ANTHROPIC_MODEL", "claude-opus-5-5")
+    timeout = float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "240"))
+    request = dict(
+        model=model,
+        max_tokens=16000,
+        system=system,
+        messages=[{"role": "user", "content": user}],
+        output_format=schema,   # structured output: the reply is validated against the Pydantic schema
+    )
+    # Thinking is adaptive by default on current models; effort sets how much of it is spent.
+    if effort := os.getenv("ANTHROPIC_EFFORT", "medium").strip():
+        request["output_config"] = {"effort": effort}
+
+    # Credentials come from the environment (ANTHROPIC_API_KEY in backend/.env), never from code.
+    async with AsyncAnthropic(timeout=timeout, max_retries=1) as client:
+        try:
+            if model in ANTHROPIC_FALLBACK_MODELS:
+                response = await client.beta.messages.parse(
+                    **request, betas=["server-side-fallback-2026-07-01"], fallbacks="default")
+            else:
+                response = await client.messages.parse(**request)
+        except TypeError as exc:
+            if "authentication" in str(exc):
+                raise RuntimeError("AI_PROVIDER=anthropic requires ANTHROPIC_API_KEY in backend/.env.") from exc
+            raise
+    if response.stop_reason == "refusal":
+        raise ValueError("The analysis service declined to analyze this document.")
+    if response.stop_reason == "max_tokens" or response.parsed_output is None:
+        raise ValueError("The analysis service returned an incomplete analysis.")
+    return response.parsed_output
 
 
 async def _call_model(system: str, user: str, schema: type[Reply]) -> Reply:
-    return await (_ollama_chat if ai_provider() == "ollama" else _openai_parse)(system, user, schema)
+    return await (_ollama_chat if ai_provider() == "ollama" else _anthropic_parse)(system, user, schema)
 
 
 def numbered(pages: list[str], page_numbers: list[int]) -> str:
@@ -379,7 +396,7 @@ MAX_PARTS = 12
 TOTAL_TIMEOUT_SECONDS = 840   # just under the browser's 15 minutes, so the backend answers first
 # A reply the model could not complete for one part. Outages and configuration errors are
 # not here: every part would fail the same way, so they stop the analysis.
-PART_FAILURES = (ValueError, TimeoutError, APITimeoutError, LengthFinishReasonError, ContentFilterFinishReasonError)
+PART_FAILURES = (ValueError, TimeoutError, APITimeoutError)
 CATEGORY_LIMIT = 4
 KEY_FACT_LIMIT = 8
 CONTEXT_CHARS = 300
@@ -617,7 +634,7 @@ async def analyze_in_parts(pages: list[str], chunks: list[list[int]], budget: in
 async def analyze_pages(pages: list[str]) -> DecisionAnalysis:
     provider = ai_provider()
     budget = (int(os.getenv("OLLAMA_MAX_TEXT_CHARS", str(DEFAULT_LOCAL_TEXT_CHARS)))
-              if provider == "ollama" else MAX_TEXT_CHARS)
+              if provider == "ollama" else int(os.getenv("ANTHROPIC_MAX_TEXT_CHARS", str(MAX_TEXT_CHARS))))
     chunks = chunk_pages(pages, budget)
     max_parts = int(os.getenv("ANALYSIS_MAX_PARTS", str(MAX_PARTS)))
     if len(chunks) > max_parts:

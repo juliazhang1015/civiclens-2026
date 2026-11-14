@@ -8,7 +8,7 @@ Built for the 2026 CIVIC Hack. This is a hackathon prototype, **not** an officia
 
 1. Upload a text-based municipal PDF (up to 10 MB / 300 pages). Longer documents are analyzed in parts and merged.
 2. Extract the document's text using PyMuPDF.
-3. Analyze it through a strict Pydantic output schema (local Ollama by default; optional OpenAI API).
+3. Analyze it through a strict Pydantic output schema (local Ollama by default; optional Claude through the Anthropic API).
 4. Display a plain-language summary, potential impacts, participation details, and supporting PDF page references.
 5. Identify missing or unverified information rather than inventing it.
 
@@ -18,7 +18,7 @@ Built for the 2026 CIVIC Hack. This is a hackathon prototype, **not** an officia
 
 - Frontend: React, TypeScript, Vite
 - Backend: Python, FastAPI, PyMuPDF
-- AI: Ollama local model (default) or optional OpenAI API (server-side only)
+- AI: Ollama local model (default) or Claude through the Anthropic API (server-side only)
 - Storage: no database in MVP; PDF contents are processed in memory
 
 ## Quick start
@@ -91,7 +91,7 @@ No software license has been selected yet. Agree on a license with the team befo
 
 ## Demo readiness
 
-See [the audit and 36-hour plan](docs/hackathon-plan.md) for priorities, roles, demo script and remaining live validation. Text above 100,000 extracted characters is rejected rather than silently truncated. Quote matching checks source presence, not correctness of interpretation.
+See [the audit and 36-hour plan](docs/hackathon-plan.md) for priorities, roles, demo script and remaining live validation. A document too long for one model request is split by page and analyzed in parts, never truncated. Quote matching checks source presence, not correctness of interpretation.
 
 For a local demo use both servers above. Production hosting must forward `/api/*` to FastAPI with the `/api` prefix removed; Vite’s development proxy is not part of a static build.
 
@@ -100,13 +100,15 @@ For a local demo use both servers above. Production hosting must forward `/api/*
 
 The backend defaults to `AI_PROVIDER=ollama`. Install Ollama on the model
 computer and run `ollama pull qwen3:4b`; copy `backend/.env.example` to
-`backend/.env`. No API key is needed for local analysis. Set
-`AI_PROVIDER=openai` and a valid `OPENAI_API_KEY` only if an authorized
-paid provider is intentionally chosen.
+`backend/.env`. No API key is needed for local analysis. For Claude, set
+`AI_PROVIDER=anthropic` and put your own `ANTHROPIC_API_KEY` in `backend/.env`.
+This is a paid API: with the default `claude-opus-5-5`, a 20-page report costs
+roughly 5-10 US cents. `ANTHROPIC_MODEL` can name a cheaper model.
 
 The frontend can be on a different laptop than the model computer. See
 [the portable two-computer setup](docs/multi-device-setup.md).
-A document longer than one model request (20,000 characters locally) is split
+A document longer than one model request (20,000 characters locally, 200,000
+with Claude) is split
 by page into parts, each part is analyzed, and the checked statements are merged.
 At most 12 parts are accepted, about 80-100 pages for a local model; a whole
 council packet still needs the relevant section extracted first.

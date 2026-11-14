@@ -5,7 +5,7 @@
 Starting point: main at dec145da55f3a81200bf5f2ee9dc0b083119e286.
 PRs #1 and #2 are merged. Main's Basic checks workflow passed.
 Application branding is CivicScope; the repository remains `juliazhang1015/civiclens-2026`.
-The React / FastAPI / PyMuPDF / OpenAI architecture is appropriate for this scope.
+The React / FastAPI / PyMuPDF / model-API architecture is appropriate for this scope (the paid provider was later changed from OpenAI to Anthropic).
 
 ## Demo blockers, in priority order
 
@@ -59,4 +59,4 @@ Keep OCR, login, scraping, maps and chat out of this iteration. Assign file owne
 4. **2:10–2:40 — Participation and uncertainty:** show what is stated and what is missing; emphasize that a proposal is not automatically approved.
 5. **2:40–3:00 — Architecture:** React displays the analysis; FastAPI extracts PDF pages; the model fills a structured schema; the validator checks quotes before returning results. Human review checks meaning.
 
-Reference: https://developers.openai.com/api/docs/guides/structured-outputs
+Reference: https://platform.claude.com/docs/en/build-with-claude/structured-outputs

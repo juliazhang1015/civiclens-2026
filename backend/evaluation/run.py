@@ -127,7 +127,7 @@ def main() -> None:
         entries = [entry for entry in entries if entry["id"] in args.only]
     pdf_dir = args.pdf_dir or args.manifest.parent / "pdfs"
     provider = ai_provider()
-    model = os.getenv("OLLAMA_MODEL", "qwen3:4b") if provider == "ollama" else os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    model = os.getenv("OLLAMA_MODEL", "qwen3:4b") if provider == "ollama" else os.getenv("ANTHROPIC_MODEL", "claude-opus-5-5")
     run = {"provider": provider, "model": model, "started": datetime.now().isoformat(timespec="seconds")}
 
     records = []

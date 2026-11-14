@@ -277,9 +277,9 @@ def test_whole_long_analysis_has_a_deadline(long_document, monkeypatch):
         asyncio.run(analyzer.analyze_pages(PAGES))
 
 
-def test_content_filter_on_one_part_keeps_the_rest(long_document):
-    from openai import ContentFilterFinishReasonError
-    long_document(fail_part=4, part_error=ContentFilterFinishReasonError())
+def test_refusal_on_one_part_keeps_the_rest(long_document):
+    # _anthropic_parse reports a declined or cut-off reply as ValueError.
+    long_document(fail_part=4, part_error=ValueError("The analysis service declined to analyze this document."))
     result = asyncio.run(analyzer.analyze_pages(PAGES))
     assert any("Pages 4\u20135 could not be analyzed" in note for note in result.unknowns)
 
