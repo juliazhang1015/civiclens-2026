@@ -39,14 +39,12 @@ def main():
     if status != 200:
         raise SystemExit('FAIL: health check')
     status, body = upload(base + '/analyze', 'not_a_pdf.pdf', b'not a pdf')
-print('Invalid PDF:', status, body[:300])
-
-if status != 400:
-    raise SystemExit(
-        f'FAIL: expected HTTP 400 for invalid PDF, got HTTP {status}'
-    )
-
-print('PASS: invalid PDF correctly rejected with HTTP 400')
+    print('Invalid PDF:', status, body[:300])
+    if status != 400:
+        raise SystemExit(
+            f'FAIL: expected HTTP 400 for invalid PDF, got HTTP {status}'
+        )
+    print('PASS: invalid PDF correctly rejected with HTTP 400')
     if args.skip_ai:
         print('PASS: basic smoke checks completed (AI analysis SKIPPED)')
         return
