@@ -9,6 +9,52 @@ cd ../frontend
 npm run build
 ```
 
+## Local API smoke checks (Mac)
+
+Run these commands from the repository root. Configure `backend/.env` using
+`backend/.env.example`; never commit this file or real API keys.
+
+- Default: `AI_PROVIDER=ollama`. Start Ollama and run `ollama pull qwen3:4b`.
+  Local analysis does not need an API key.
+- Optional paid provider: set `AI_PROVIDER=anthropic` and your
+  `ANTHROPIC_API_KEY` in `backend/.env`. Setting a key alone does not change
+  the provider. OpenAI is no longer supported.
+
+Start the backend (the script creates a virtual environment and installs dependencies):
+
+```bash
+bash run_backend_mac.sh
+```
+
+In a second terminal, from the repository root:
+
+```bash
+# Health and invalid-PDF rejection only; no model call or API key needed.
+python3 backend/tests/smoke_api.py --skip-ai
+
+# Real analysis using the configured provider and the included sample.
+python3 backend/tests/smoke_api.py --pdf demo_samples/waterloo_lease_2pages.pdf
+
+# Or supply an existing local, text-based PDF (replace this path).
+python3 backend/tests/smoke_api.py --pdf "/absolute/path/to/municipal-report.pdf"
+```
+
+`--pdf` accepts a local file path, not a URL. For official source documents,
+follow the download instructions in [the sample manifest guide](../data/sample_decisions/README.md),
+then pass the downloaded file path. Run the commands above from the repository root
+so the included sample's relative path resolves correctly.
+
+Uploads are limited to 10 MB and 300 pages. Long documents are split into parts;
+the default maximum is 12 parts, so a document within the page limit can still
+exceed the model's text budget. Prefer the relevant report or section of a council
+packet. The smoke client waits up to 900 seconds per request, covering the default
+840-second overall deadline for multipart analysis.
+
+The smoke test exits unsuccessfully on a non-200 analysis response or missing
+required response fields. `--skip-ai` explicitly reports that AI analysis was
+skipped. A passing smoke test checks API integration, not factual accuracy;
+review claims and citations using the validation protocol below.
+
 ## Manual checks
 
 | Case | Expected result | Actual | Status |
@@ -16,7 +62,7 @@ npm run build
 | No file selected | Analyze button disabled | TBD | Not run |
 | Non-PDF upload | Clear error | TBD | Not run |
 | Scanned PDF | Explains that OCR is not supported | TBD | Not run |
-| API key missing | Configuration error, no fake result | TBD | Not run |
+| Anthropic selected but API key missing | Configuration error, no fake result | TBD | Not run |
 | Official road proposal | Relevant changes + page citations | TBD | Not run |
 | Official zoning proposal | Same pipeline works; zoning-specific facts | TBD | Not run |
 | Official public facility proposal | Same pipeline works | TBD | Not run |
