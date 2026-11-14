@@ -24,3 +24,6 @@ uploads/
 *.tsbuildinfo
 playwright-report/
 test-results/
+# Evaluation inputs and outputs (PDFs stay local; see data/sample_decisions/README.md)
+data/sample_decisions/pdfs/
+eval_results/

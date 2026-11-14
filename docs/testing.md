@@ -33,6 +33,25 @@ npm run build
 
 **Caution:** Exact quote matching alone does not prove correctness; a human reviewer still checks meaning and context.
 
+## Model evaluation
+
+`data/sample_decisions/manifest.json` lists the test documents and what each analysis must contain. PDFs go in `data/sample_decisions/pdfs/` (not committed). The script runs each one through the live pipeline with the model set in `backend/.env`:
+
+```bash
+cd backend
+python -m evaluation.run --manifest ../data/sample_decisions/manifest.json
+```
+
+It writes `eval_results/<time>-<model>/report.md` (not committed): time, statement count, unmatched quotes and manifest checks per document, then every statement with its quote and an empty Verdict column for step 3 above. Copy the findings worth keeping into the log below.
+
+### Error log
+
+| Date | Document | Model | Observed | Cause | Fix |
+| --- | --- | --- | --- | --- | --- |
+| 2026-11-14 | waterloo-lease-2025 | mistral-nemo | Whole analysis rejected (422) | Model ended verbatim quotes with `...` | Quote matcher ignores a leading or trailing ellipsis (#8) |
+| 2026-11-14 | waterloo-lease-2025 | mistral-nemo | In-kind lease and utility contribution (page 2) not mentioned | Open | Open |
+| 2026-11-14 | waterloo-lease-2025 | mistral-nemo | Uncertainty "Future status of the consultation process" although the report describes no consultation | Open | Open |
+
 ## Reliability PR verification
 
 - Local Python suite: **19 passed** (includes three synthetic municipal categories through real PDF extraction and SDK parsing with provider HTTP mocked).
