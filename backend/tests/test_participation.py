@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 
 from app.analyzer import extract_dates, filter_historical_participation, verify_evidence
-from app.schemas import DecisionAnalysis, Evidence, Finding
+from app.schemas import DecisionAnalysis, Evidence, Finding, ParticipationStep
 
 
 PAST_SURVEY = (
@@ -14,7 +14,7 @@ PAST_SURVEY = (
 
 
 def analysis_with_participation(quote: str) -> DecisionAnalysis:
-    finding = Finding(text="Public consultation through EngageWR survey (4 weeks).", evidence=[
+    finding = ParticipationStep(text="Public consultation through EngageWR survey (4 weeks).", evidence=[
         Evidence(page=2, quote=quote)
     ])
     return DecisionAnalysis(
@@ -155,3 +155,45 @@ def test_undated_second_quote_keeps_the_step():
 ])
 def test_extract_dates_edge_cases(text, expected):
     assert extract_dates(text) == expected
+
+
+# --- The model states when each step ends; the PDF must back the date up --------
+
+MEETING_QUOTE = "This meeting provides an opportunity to comment on the proposed changes within the updated plan."
+DOCUMENT = ["Council Meeting          Page 1 of 2          December 1, 2025",
+            MEETING_QUOTE + " Comments on the next phase close on March 1, 2027."]
+
+
+def step(quote: str, ends_on: str | None) -> DecisionAnalysis:
+    result = analysis_with_participation(quote)
+    result.participation = [ParticipationStep(text="A chance to comment.", ends_on=ends_on,
+                                              evidence=[Evidence(page=2, quote=quote)])]
+    return result
+
+
+def test_step_with_a_passed_end_date_is_removed_even_when_the_quote_has_no_date():
+    # Seen live: the quote was undated and only the model's wording said "December 1, 2025".
+    result = step(MEETING_QUOTE, "2025-12-01")
+    filter_historical_participation(result, today=TODAY, pages=DOCUMENT)
+    assert result.participation == []
+    assert any("December 1, 2025 (page 2), which has passed" in note for note in result.unknowns)
+
+
+def test_step_ending_in_the_future_is_kept_despite_past_wording():
+    result = step("A survey was available online.", "2027-03-01")
+    filter_historical_participation(result, today=TODAY, pages=DOCUMENT)
+    assert len(result.participation) == 1
+
+
+@pytest.mark.parametrize("ends_on", ["2024-06-30", "last spring", "2025-13-45", ""])
+def test_end_date_the_pdf_does_not_contain_is_ignored(ends_on):
+    # An invented or unreadable date must not remove a step; the quote rules decide instead.
+    result = step("Residents can email comments to the City Clerk.", ends_on)
+    filter_historical_participation(result, today=TODAY, pages=DOCUMENT)
+    assert len(result.participation) == 1
+
+
+def test_standing_channel_without_an_end_date_is_kept():
+    result = step("Follow our project and provide feedback directly through engage.ca", None)
+    filter_historical_participation(result, today=TODAY, pages=DOCUMENT)
+    assert len(result.participation) == 1

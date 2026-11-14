@@ -14,7 +14,7 @@ from ollama import AsyncClient, ResponseError
 from anthropic import APITimeoutError, AsyncAnthropic
 from pydantic import BaseModel
 
-from .schemas import DecisionAnalysis, Evidence, Finding, KeyFact, MergedSelection
+from .schemas import DecisionAnalysis, Evidence, Finding, KeyFact, MergedSelection, ParticipationStep
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -38,6 +38,7 @@ Participation & next steps means an actual upcoming or open opportunity in the d
 Phrases such as "a survey was available", "questionnaires were distributed", or "a consultation took place" describe completed participation: do NOT list them as future next steps.
 A PDF from an earlier year cannot verify whether a consultation is open today. Do NOT imply it is ongoing without current confirmation. If there is no explicitly upcoming/open participation action, return an empty participation array and state the uncertainty.
 When participation is explicitly scheduled in the source, describe it as a dated historical-document announcement and tell readers to verify its current status on the municipality's official website.
+For each participation item, set ends_on to the day the meeting takes place or the comment period closes, as YYYY-MM-DD, when the document gives that date. Use null for a standing channel with no end date, such as an email address or a web page. Do not use the document's own date unless the opportunity itself is on that day.
 Do not invent a trade-off merely to fill that category. State only evidence-supported potential trade-offs.
 Prioritize exact funding amounts, eligibility limits, and decision dates when they materially affect the proposal.
 The summary says in two or three plain sentences what is being decided, who decides it and when, and names the most important amount and date the document gives.
@@ -271,10 +272,24 @@ def extract_dates(text: str) -> list[date]:
     return [found for found, _ in date_mentions(text)]
 
 
-def filter_historical_participation(result: DecisionAnalysis, today: date | None = None) -> None:
+def stated_end(step: ParticipationStep, written: set[date] | None) -> date | None:
+    """The end date the model gave for a step, if it is a real date the PDF also contains.
+
+    A date the document never writes is ignored: an invented one must not remove a live step.
+    """
+    try:
+        ends = date.fromisoformat((step.ends_on or "").strip())
+    except ValueError:
+        return None
+    return ends if written is None or ends in written else None
+
+
+def filter_historical_participation(result: DecisionAnalysis, today: date | None = None,
+                                    pages: list[str] | None = None) -> None:
     """Remove next-step findings whose opportunity is over.
 
-    Dates in the quotes decide first: a finding with a date still ahead is kept
+    The end date the model states for a step decides first, when the PDF (`pages`)
+    contains that date. Otherwise dates in the quotes decide: a finding with a date still ahead is kept
     whatever its wording, and one whose every date has passed is removed. A passed
     date does not decide alone when the quotes also hold a date this parser cannot
     place or say the step is still open: a report date must not hide a live
@@ -282,9 +297,20 @@ def filter_historical_participation(result: DecisionAnalysis, today: date | None
     conservative: mixed or ambiguous evidence is left for human review.
     """
     today = today or date.today()
+    written = {found for page in pages for found, _ in date_mentions(page)} if pages is not None else None
     retained = []
     notes = []
     for finding in result.participation:
+        if ends := stated_end(finding, written):
+            if ends >= today:
+                retained.append(finding)
+            else:
+                notes.append(
+                    f"The document mentions a participation step dated {ends:%B} {ends.day}, {ends.year} "
+                    f"(page {finding.evidence[0].page}), which has passed. "
+                    "Check the municipality's official website for current opportunities."
+                )
+            continue
         dated = [(found, label, ev.page) for ev in finding.evidence for found, label in date_mentions(ev.quote)]
         unclear = any(UNPLACED_DATE.search(DATE_MENTION.sub(" ", ev.quote)) or STILL_OPEN.search(ev.quote)
                       for ev in finding.evidence)
@@ -497,10 +523,27 @@ async def analyze_part(pages: list[str], part: Part, index: int, parts: list[Par
     part.dropped, part.summary_supported = drop_unsupported(analysis, pages, set(part.page_numbers))
     # Before merging, so steps that have passed do not use up the participation limit.
     reported = len(analysis.unknowns)
-    filter_historical_participation(analysis)
+    filter_historical_participation(analysis, pages=pages)
     part.notes = analysis.unknowns[reported:]
     del analysis.unknowns[reported:]
     part.analysis = analysis
+
+
+PASSED_STEP_NOTE = re.compile(r"^(The document mentions a participation step dated .+?) \(page (\d+)\)(, which has passed\..*)$")
+
+
+def merge_passed_step_notes(notes: list[str]) -> list[str]:
+    """One note per date: parts of a long document often report the same meeting from different pages."""
+    merged: dict[tuple[str, str], list[int]] = {}
+    other = []
+    for note in dict.fromkeys(notes):
+        if match := PASSED_STEP_NOTE.match(note):
+            merged.setdefault((match[1], match[3]), []).append(int(match[2]))
+        else:
+            other.append(note)
+    return other + [
+        f"{start} ({'page' if len(pages) == 1 else 'pages'} {', '.join(map(str, sorted(set(pages))))}){end}"
+        for (start, end), pages in merged.items()]
 
 
 def collect_candidates(parts: list[Part]) -> list[Candidate]:
@@ -625,7 +668,7 @@ async def analyze_in_parts(pages: list[str], chunks: list[list[int]], budget: in
                            "far apart may have been missed.")
     result.unknowns += [f"{part.page_range} could not be analyzed, so findings from there are missing."
                         for part in parts if part.analysis is None]
-    result.unknowns += dict.fromkeys(note for part in parts for note in part.notes)
+    result.unknowns += merge_passed_step_notes([note for part in parts for note in part.notes])
     if dropped := sum(part.dropped for part in parts):
         result.unknowns.append(dropped_note(dropped))
     return result
@@ -653,7 +696,7 @@ async def analyze_pages(pages: list[str]) -> DecisionAnalysis:
         async with asyncio.timeout(total):
             result = await analyze_in_parts(pages, chunks, budget)
 
-    filter_historical_participation(result)
+    filter_historical_participation(result, pages=pages)
     if any(not page.strip() for page in pages):
         result.unknowns.append(
             "Some PDF pages have no extractable text; images or scanned content on those pages were not analyzed."

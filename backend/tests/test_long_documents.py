@@ -296,3 +296,11 @@ def test_parts_running_at_once_are_not_mistaken_for_failed(long_document, monkey
     monkeypatch.setattr(analyzer, "_call_model", slow)
     result = asyncio.run(analyzer.analyze_pages(PAGES))
     assert sorted(f.evidence[0].page for f in result.proposed_changes) == [1, 2, 4, 5]
+
+
+def test_same_passed_meeting_reported_from_several_pages_is_one_note():
+    note = "The document mentions a participation step dated December 1, 2025 (page {}), which has passed. Check the website."
+    other = "The PDF describes past consultation."
+    merged = analyzer.merge_passed_step_notes([note.format(171), other, note.format(1), note.format(171)])
+    assert merged == [other, "The document mentions a participation step dated December 1, 2025 (pages 1, 171), "
+                             "which has passed. Check the website."]

@@ -57,6 +57,17 @@ It writes `eval_results/<time>-<model>/report.md` (not committed): time, stateme
 | 2026-11-14 | waterloo-lease-2025 (forced into 2 parts) | mistral-nemo | Part 2 analyzed the cover page again and reported nothing from page 2 | The whole first page was repeated in each part as context | Parts get a 300-character header marked as context, and may cite only their own pages |
 | 2026-11-14 | waterloo-lease-2025 | mistral-nemo | Whole analysis rejected (422) | Summary quote joined two real passages with `...` | A joined quote is split into separate excerpts, each checked on the page |
 | 2026-11-14 | waterloo-lease-2025 | mistral-nemo | Lease term filed as a key "amount" | Model picks the wrong kind | Open; the value itself is verbatim |
+| 2026-11-14 | waterloo-council-packet-2025-12-01 | claude-opus-5-5 | Three steps for the December 1, 2025 meeting listed under "Participation & next steps" | The quotes had no date; only the model's wording did, and the filter reads quotes | Each participation item now carries `ends_on`; a passed date the PDF also contains removes the step. Re-run: removed, standing email channel kept |
+
+### Live results, 2026-11-14
+
+| Document | Model | Result | Time | Statements | Unmatched quotes | Manifest checks |
+| --- | --- | --- | --- | --- | --- | --- |
+| waterloo-lease-2025 (2 pages) | mistral-nemo (local) | ok | 22 s | 5 | 0 | 3/4 |
+| waterloo-lease-2025 (2 pages) | claude-opus-5-5 | ok | 14 s | 11 | 0 | 4/4 |
+| waterloo-council-packet-2025-12-01 (217 pages, 3 parts) | claude-opus-5-5 | ok | 63 s | 26 | 0 | not set at the time |
+
+With Claude the lease term is stated correctly ("three more years") and the in-kind lease and utility contribution are reported; both were wrong or missing with mistral-nemo. Statements have not been given a human verdict yet. A whole council packet holds many unrelated items, so its summary covers only the largest ones: upload the report for one item when that is what matters.
 
 ## Reliability PR verification
 

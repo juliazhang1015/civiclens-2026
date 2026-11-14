@@ -17,6 +17,12 @@ class Finding(StrictModel):
     evidence: list[Evidence] = Field(min_length=1)
 
 
+class ParticipationStep(Finding):
+    """A way to take part. `ends_on` is the day it takes place or closes, as YYYY-MM-DD,
+    when the document gives one; null for a standing channel with no end date."""
+    ends_on: str | None = None
+
+
 class KeyFact(StrictModel):
     """An amount or date residents should not miss; `value` is copied from the quote."""
     kind: Literal["amount", "date"]
@@ -33,7 +39,7 @@ class DecisionAnalysis(StrictModel):
     affected_groups: list[Finding]
     potential_benefits: list[Finding]
     potential_tradeoffs: list[Finding]
-    participation: list[Finding]
+    participation: list[ParticipationStep]
     unknowns: list[str]
 
 
