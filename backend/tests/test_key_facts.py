@@ -68,6 +68,11 @@ def test_kind_is_restricted():
     ("5, 2027", "Comments are due March 15, 2027"),
     ("1", "The fee rises from $1,250 to $1,400 per unit"),
     ("40", "a 40% increase in fees"),
+    ("$500", "The grant is $500 000"),                            # space-separated thousands
+    ("$500", "The grant is $500\u00a0000"),                       # ...with a non-breaking space
+    ("$500", "The grant is $500\u2009000"),                       # ...with a thin space
+    ("000", "The grant is $500 000"),
+    ("$2 500", "The total is $2 500 000"),
 ])
 def test_value_must_be_the_whole_figure(value, quote):
     result = analysis_with_summary(quote, fact("amount", value, quote))
@@ -81,6 +86,9 @@ def test_value_must_be_the_whole_figure(value, quote):
     ("March 15, 2027", "Comments are due March 15, 2027"),
     ("40%", "a 40% increase in fees"),
     ("$1,250", "The fee rises from $1,250 to $1,400 per unit"),
+    ("$500 000", "The grant is $500\u00a0000 over two years"),
+    ("$500", "The fee is $500 2026 onward"),                      # a year after an amount is not a thousands group
+    ("January 15", "Comments close January 15 2027"),
 ])
 def test_whole_figures_pass(value, quote):
     result = analysis_with_summary(quote, fact("amount", value, quote))

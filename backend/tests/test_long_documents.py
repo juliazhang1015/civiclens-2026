@@ -304,3 +304,14 @@ def test_same_passed_meeting_reported_from_several_pages_is_one_note():
     merged = analyzer.merge_passed_step_notes([note.format(171), other, note.format(1), note.format(171)])
     assert merged == [other, "The document mentions a participation step dated December 1, 2025 (pages 1, 171), "
                              "which has passed. Check the website."]
+
+
+def test_merge_that_only_misfiles_statements_is_treated_as_failed(long_document):
+    # Real ids, but each under a category it does not belong to: nothing would survive assembly.
+    long_document(merge=lambda ids: MergedSelection(
+        summary="Summary.", summary_sources=ids["PROPOSED_CHANGES"][:1], key_facts=ids["PROPOSED_CHANGES"],
+        proposed_changes=ids.get("KEY_FACTS", []), affected_groups=ids["PROPOSED_CHANGES"],
+        potential_benefits=[], potential_tradeoffs=[], participation=[], unknowns=[]))
+    result = asyncio.run(analyzer.analyze_pages(PAGES))
+    assert len(result.proposed_changes) == 4
+    assert any("without a final review" in note for note in result.unknowns)

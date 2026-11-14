@@ -169,8 +169,12 @@ def drop_unsupported(result: DecisionAnalysis, pages: list[str],
     def value_is_quoted(fact: KeyFact) -> bool:
         value = normalize_quote(fact.value).casefold().rstrip(" .,;:")
         # The whole figure, not a piece of one: "$500" is not in "$500,000", "$12.4" is not
-        # "$12.4 million", "March 1" is not in "March 15".
-        whole = re.compile(rf"(?<![\w$.,]){re.escape(value)}(?![.,]?\d)(?!\w)(?!\s*(?:{UNIT_WORDS}))")
+        # "$12.4 million", "March 1" is not in "March 15". A space also groups thousands
+        # ("$500 000"): three digits after one, or a digit before one, continue the number.
+        before = r"(?<!\d\s)" if value[:1].isdigit() else ""
+        after = r"(?!\s\d{3}(?!\d))" if value[-1:].isdigit() else ""
+        whole = re.compile(
+            rf"(?<![\w$.,]){before}{re.escape(value)}(?![.,]?\d)(?!\w){after}(?!\s*(?:{UNIT_WORDS}))")
         # An amount or a date always has a digit; this rejects a place or a name filed as one.
         quoted = any(char.isdigit() for char in value) and any(
             whole.search(normalize_quote(ev.quote).casefold()) for ev in fact.evidence)
@@ -650,9 +654,9 @@ async def analyze_in_parts(pages: list[str], chunks: list[list[int]], budget: in
     try:
         selection = await _call_model(MERGE_INSTRUCTIONS, merge_prompt(candidates, open_questions, max(budget, MERGE_LIST_MIN_CHARS)),
                                       MergedSelection)
-        chosen = {i for name in ("key_facts", *FINDING_CATEGORIES) for i in getattr(selection, name)}
-        listed = {c.id for c in candidates if c.id and c.category != "summary"}
-        if listed and not chosen & listed:
+        # Judged as assemble() does: a number counts only under the category it was listed in.
+        listed = [c for c in candidates if c.id and c.category != "summary"]
+        if listed and not any(c.id in getattr(selection, c.category) for c in listed):
             raise ValueError("the merge reply selected none of the listed statements")
     except PART_FAILURES as exc:
         logger.warning("Merging the parts failed: %s", exc if isinstance(exc, ValueError) and len(str(exc)) < 80
