@@ -5,7 +5,7 @@ from .pdf_reader import MAX_FILE_SIZE, extract_pages, PdfError
 from .analyzer import analyze_pages
 from .schemas import DecisionAnalysis
 
-app = FastAPI(title="CivicLens API", version="0.1.0")
+app = FastAPI(title="CivicScope API", version="0.1.0")
 
 
 @app.get("/health")
