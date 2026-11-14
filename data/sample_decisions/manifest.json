@@ -6,8 +6,8 @@
       "municipality": "City of Waterloo",
       "category": "public facilities",
       "url": "https://www.waterloo.ca/media/cykl4t0i/council-meeting-packet-december-1-2025.pdf",
-      "source_note": "Pages 19-20 of the December 1, 2025 Council meeting packet at the URL above.",
-      "file": "waterloo_lease_2pages.pdf",
+      "source_note": "Accessed 2026-11-14. Pages 19-20 of the December 1, 2025 Council meeting packet.",
+      "file": "waterloo_council_packet_2025-12-01.pdf",
       "expect": {
         "must_include": [
           "510 Dutton",
@@ -16,7 +16,11 @@
         ],
         "must_not_include": [],
         "participation_must_be_empty": true
-      }
+      },
+      "pages": [
+        19,
+        20
+      ]
     },
     {
       "id": "waterloo-council-packet-2025-12-01",

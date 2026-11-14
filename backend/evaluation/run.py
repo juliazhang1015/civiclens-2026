@@ -50,6 +50,18 @@ def run_checks(result: DecisionAnalysis, expect: dict) -> list[tuple[str, bool]]
     return checks
 
 
+def select_pages(pages: list[str], page_range) -> list[str]:
+    """`[first, last]`, 1-based and inclusive: one report inside a larger PDF such as a council packet.
+
+    Page numbers in the analysis then count from the first selected page.
+    """
+    valid = (isinstance(page_range, list) and len(page_range) == 2
+             and all(isinstance(n, int) for n in page_range) and 1 <= page_range[0] <= page_range[1] <= len(pages))
+    if not valid:
+        raise ValueError(f"pages must be [first, last] within 1-{len(pages)}, got {page_range!r}")
+    return pages[page_range[0] - 1:page_range[1]]
+
+
 async def evaluate_document(entry: dict, pdf_dir: Path) -> dict:
     record = {**{k: entry.get(k) for k in ("id", "title", "url", "category")},
               "status": "missing", "pages": 0, "chars": 0, "seconds": 0.0, "unmatched_quotes": 0, "checks": []}
@@ -64,6 +76,10 @@ async def evaluate_document(entry: dict, pdf_dir: Path) -> dict:
     start = time.monotonic()
     try:
         pages = extract_pages(path.read_bytes())
+        if "pages" in entry:
+            pages = select_pages(pages, entry["pages"])
+            record["page_range"] = list(entry["pages"])
+            record["file"] = entry["file"]
         record.update(pages=len(pages), chars=sum(map(len, pages)))
         result = await analyze_pages(pages)
         record.update(status="ok", analysis=json.loads(result.model_dump_json()),
@@ -96,6 +112,9 @@ def render_report(records: list[dict], run: dict) -> str:
         lines += ["", f"## {r['id']}: {cell(r.get('title') or '')}", ""]
         if r.get("url"):
             lines += [f"Source: {r['url']} ({r.get('category') or 'uncategorised'}, {r['chars']} characters)", ""]
+        if r.get("page_range"):
+            first, last = r["page_range"]
+            lines += [f"Analyzed pages {first}\u2013{last} of {r['file']}; page numbers below count from page {first}.", ""]
         if r["status"] != "ok":
             lines.append(f"**{r['status']}**: {cell(r.get('error', ''))}")
             continue
@@ -114,13 +133,14 @@ def render_report(records: list[dict], run: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> int:
+    """Returns 0 when at least one document was analyzed, 1 when none was."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--pdf-dir", type=Path, help="defaults to pdfs/ next to the manifest")
     parser.add_argument("--out", type=Path, default=Path("../eval_results"))
     parser.add_argument("--only", nargs="*", help="document ids to run")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     entries = json.loads(args.manifest.read_text())["documents"]
     if args.only:
@@ -142,7 +162,11 @@ def main() -> None:
     (out / "results.json").write_text(json.dumps({"run": run, "documents": records}, indent=1, ensure_ascii=False))
     (out / "report.md").write_text(render_report(records, run))
     print(f"Wrote {out / 'report.md'}")
+    if not any(record["status"] == "ok" for record in records):
+        print("No document was analyzed. Put the PDFs listed in the manifest in", pdf_dir)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -42,6 +42,8 @@ cd backend
 python -m evaluation.run --manifest ../data/sample_decisions/manifest.json
 ```
 
+The command exits with status 1 if no document could be analyzed, for example when the PDFs are not in place.
+
 It writes `eval_results/<time>-<model>/report.md` (not committed): time, statement count, unmatched quotes and manifest checks per document, then every statement with its quote and an empty Verdict column for step 3 above. Copy the findings worth keeping into the log below.
 
 ### Error log
