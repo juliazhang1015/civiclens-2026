@@ -1,6 +1,6 @@
-# CivicLens — Municipal Decision Explorer
+# CivicScope — Municipal Decision Explorer
 
-CivicLens is a reusable, source-grounded prototype that helps residents understand municipal proposals: what may change, who could be affected, and how to participate.
+CivicScope is a reusable, source-grounded prototype that helps residents understand municipal proposals: what may change, who could be affected, and how to participate.
 
 Built for the 2026 CIVIC Hack. This is a hackathon prototype, **not** an official municipal service.
 
