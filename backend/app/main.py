@@ -36,6 +36,8 @@ async def analyze(file: UploadFile = File(...)):
         raise HTTPException(status_code=503, detail="The analysis provider is unavailable. Please try again later.")
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception:
         # Do not expose API keys, prompts or internal provider responses.
         return JSONResponse(status_code=422, content={"detail": "The document could not be analyzed reliably. Please try a shorter, text-based municipal PDF."})
