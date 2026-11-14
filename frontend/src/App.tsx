@@ -46,7 +46,7 @@ export default function App() {
   }
 
   return <div className="site">
-    <header><div className="brand"><Building2 size={25} /> <span>CivicLens</span></div><span className="top-tag">CIVIC Hack · Prototype</span></header>
+    <header><div className="brand"><Building2 size={25} /> <span>CivicScope</span></div><span className="top-tag">CIVIC Hack · Prototype</span></header>
     <main>
       <div className="hero"><p className="eyebrow">MUNICIPAL DECISIONS, MADE CLEAR</p>
         <h1>Understand what your city is deciding.</h1>
