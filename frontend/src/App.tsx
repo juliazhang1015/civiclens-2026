@@ -3,8 +3,9 @@ import { Building2, FileUp, FileText, ExternalLink, AlertCircle, ArrowRight, Loa
 
 type Evidence = { page: number; quote: string }
 type Finding = { text: string; evidence: Evidence[] }
+type KeyFact = { kind: 'amount' | 'date'; label: string; value: string; evidence: Evidence[] }
 type Decision = {
-  document_title: string; summary: Finding; proposed_changes: Finding[]; affected_groups: Finding[]
+  document_title: string; summary: Finding; key_facts: KeyFact[]; proposed_changes: Finding[]; affected_groups: Finding[]
   potential_benefits: Finding[]; potential_tradeoffs: Finding[]; participation: Finding[]; unknowns: string[]
 }
 const categories = ['proposed_changes', 'affected_groups', 'potential_benefits', 'potential_tradeoffs', 'participation'] as const
@@ -15,10 +16,15 @@ function isFinding(value: unknown): value is Finding {
   const f = value as Finding
   return typeof f.text === 'string' && Array.isArray(f.evidence) && f.evidence.length > 0 && f.evidence.every(e => e && Number.isInteger(e.page) && e.page > 0 && typeof e.quote === 'string' && e.quote.trim().length > 0)
 }
+function isKeyFact(value: unknown): value is KeyFact {
+  if (!value || typeof value !== 'object') return false
+  const k = value as KeyFact
+  return (k.kind === 'amount' || k.kind === 'date') && typeof k.value === 'string' && isFinding({ text: k.label, evidence: k.evidence })
+}
 function isDecision(value: unknown): value is Decision {
   if (!value || typeof value !== 'object') return false
   const d = value as Decision
-  return typeof d.document_title === 'string' && isFinding(d.summary) && categories.every(k => Array.isArray(d[k]) && d[k].every(isFinding)) && Array.isArray(d.unknowns) && d.unknowns.every(s => typeof s === 'string')
+  return typeof d.document_title === 'string' && isFinding(d.summary) && Array.isArray(d.key_facts) && d.key_facts.every(isKeyFact) && categories.every(k => Array.isArray(d[k]) && d[k].every(isFinding)) && Array.isArray(d.unknowns) && d.unknowns.every(s => typeof s === 'string')
 }
 function Findings({ title, items, source, potential = false, emptyMessage = "Not identified in the supplied text." }: { title: string; items: Finding[]; source: string; potential?: boolean; emptyMessage?: string }) {
   return <section className={`result-section ${potential ? 'potential' : ''}`}><h3>{title}</h3>
@@ -85,6 +91,7 @@ export default function App() {
       {result && <div className="results"><div className="result-intro"><div><p className="eyebrow">02 / EXPLORE THE FINDINGS</p><h2 ref={resultHeading} tabIndex={-1}>{result.document_title}</h2><p className="muted">Source: {file?.name}</p></div><a className="source-link" href={source} target="_blank" rel="noreferrer"><FileText size={16}/> Open PDF</a></div>
         <div className="notice"><AlertCircle size={18}/><span>AI-generated interpretation. Excerpts were matched to the PDF text; this does not verify the meaning of each claim. Check the source and current municipal notices.</span></div>
         <Findings title="In plain language" items={[result.summary]} source={source}/>
+        <Findings title="Key amounts and dates" items={result.key_facts.map(k => ({ text: `${k.value}: ${k.label}`, evidence: k.evidence }))} source={source} emptyMessage="No amounts or dates were identified in the supplied text."/>
         <div className="section-label">IN THE DOCUMENT <span>Source-based findings · verify the interpretation</span></div><div className="result-grid"><Findings title="What is proposed?" items={result.proposed_changes} source={source}/><Findings title="Who may be affected?" items={result.affected_groups} source={source}/></div>
         <div className="section-label">POTENTIAL IMPACTS <span>Possibilities, not established outcomes</span></div><div className="result-grid"><Findings title="Potential benefits" items={result.potential_benefits} source={source} potential/><Findings title="Potential trade-offs" items={result.potential_tradeoffs} source={source} potential/></div>
         <Findings title="Participation & next steps" items={result.participation} source={source} emptyMessage="No currently open participation opportunity is verified by this document. Check the municipality\u2019s official website."/><p className="footnote">Dates in the document may have passed. Confirm current opportunities on the municipality’s official website.</p>

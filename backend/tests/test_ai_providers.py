@@ -26,6 +26,7 @@ def test_ollama_works_without_paid_api_key(monkeypatch):
                     "text": "A zoning change is proposed.",
                     "evidence": [{"page": 1, "quote": "A zoning change is proposed."}],
                 },
+                "key_facts": [],
                 "proposed_changes": [],
                 "affected_groups": [],
                 "potential_benefits": [],

@@ -19,7 +19,7 @@ from app.analyzer import FINDING_CATEGORIES, ai_provider, analyze_pages
 from app.pdf_reader import extract_pages
 from app.schemas import DecisionAnalysis
 
-SECTION_TITLES = {"summary": "Summary", "proposed_changes": "Proposed", "affected_groups": "Affected",
+SECTION_TITLES = {"summary": "Summary", "key_facts": "Key fact", "proposed_changes": "Proposed", "affected_groups": "Affected",
                   "potential_benefits": "Benefit", "potential_tradeoffs": "Trade-off",
                   "participation": "Participation"}
 
@@ -40,7 +40,8 @@ def squash(text: str) -> str:
 def run_checks(result: DecisionAnalysis, expect: dict) -> list[tuple[str, bool]]:
     """Manifest expectations against the analysis text shown to residents (not the quotes)."""
     findings = [result.summary, *(f for c in FINDING_CATEGORIES for f in getattr(result, c))]
-    shown = squash(" ".join([result.document_title, *(f.text for f in findings), *result.unknowns]))
+    facts = (f"{fact.value} {fact.label}" for fact in result.key_facts)
+    shown = squash(" ".join([result.document_title, *(f.text for f in findings), *facts, *result.unknowns]))
     checks = [(f'mentions "{phrase}"', squash(phrase) in shown) for phrase in expect.get("must_include", [])]
     checks += [(f'does not say "{phrase}"', squash(phrase) not in shown)
                for phrase in expect.get("must_not_include", [])]
@@ -101,8 +102,10 @@ def render_report(records: list[dict], run: dict) -> str:
         lines += [f"- {'PASS' if ok else 'FAIL'} {name}" for name, ok in r["checks"]]
         lines += ["", "| Section | Statement | Evidence | Verdict |", "| --- | --- | --- | --- |"]
         analysis = r["analysis"]
-        for section in ("summary", *FINDING_CATEGORIES):
-            findings = [analysis[section]] if section == "summary" else analysis[section]
+        key_facts = [{"text": f"{fact['value']}: {fact['label']}", "evidence": fact["evidence"]}
+                     for fact in analysis["key_facts"]]
+        for section in ("summary", "key_facts", *FINDING_CATEGORIES):
+            findings = {"summary": [analysis["summary"]], "key_facts": key_facts}.get(section) or analysis[section]
             for finding in findings:
                 evidence = "; ".join(f"p{ev['page']}: “{cell(ev['quote'])}”" for ev in finding["evidence"])
                 lines.append(f"| {SECTION_TITLES[section]} | {cell(finding['text'])} | {evidence} |  |")

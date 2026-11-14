@@ -16,7 +16,7 @@ def analysis(summary_quote: str = SUMMARY_QUOTE, **categories: list[Finding]) ->
                                     "potential_tradeoffs", "participation")}
     fields.update(categories)
     return DecisionAnalysis(document_title="Test", summary=finding("Summary.", (1, summary_quote)),
-                            unknowns=[], **fields)
+                            key_facts=[], unknowns=[], **fields)
 
 
 @pytest.mark.parametrize("model_quote,pdf_text", [

@@ -9,7 +9,7 @@ from evaluation import run as evaluation
 
 def analysis(participation=False) -> DecisionAnalysis:
     finding = {"text": "The lease costs $12,000 per year.", "evidence": [{"page": 1, "quote": "$12,000 per year"}]}
-    return DecisionAnalysis(document_title="Lease", summary=finding, proposed_changes=[finding],
+    return DecisionAnalysis(document_title="Lease", summary=finding, key_facts=[], proposed_changes=[finding],
                             affected_groups=[], potential_benefits=[], potential_tradeoffs=[],
                             participation=[finding] if participation else [], unknowns=[])
 

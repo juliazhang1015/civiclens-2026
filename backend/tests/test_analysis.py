@@ -14,7 +14,7 @@ from app.schemas import DecisionAnalysis
 
 def decision(quote="A protected cycle lane is proposed.", page=1):
     finding = {"text": quote, "evidence": [{"page": page, "quote": quote}]}
-    return DecisionAnalysis(document_title="Test proposal", summary=finding,
+    return DecisionAnalysis(document_title="Test proposal", summary=finding, key_facts=[],
         proposed_changes=[finding], affected_groups=[], potential_benefits=[],
         potential_tradeoffs=[], participation=[], unknowns=["No consultation deadline is stated."])
 

@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from ollama import AsyncClient, ResponseError
 from openai import AsyncOpenAI
 
-from .schemas import DecisionAnalysis, Evidence, Finding
+from .schemas import DecisionAnalysis, Evidence, Finding, KeyFact
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -37,6 +37,13 @@ A PDF from an earlier year cannot verify whether a consultation is open today. D
 When participation is explicitly scheduled in the source, describe it as a dated historical-document announcement and tell readers to verify its current status on the municipality's official website.
 Do not invent a trade-off merely to fill that category. State only evidence-supported potential trade-offs.
 Prioritize exact funding amounts, eligibility limits, and decision dates when they materially affect the proposal.
+The summary says in two or three plain sentences what is being decided, who decides it and when, and names the most important amount and date the document gives.
+key_facts lists the amounts and dates a resident should not miss: costs, fees, funding, who pays, decision or meeting dates, deadlines, and when something starts or ends. Use kind "amount" or "date". Copy `value` character for character from the quote (for example "$2.4 million" or "January 15, 2027") and say what it is in `label`. Read every page for these, including financial sections. At most eight; use an empty array if the document gives none.
+Give dates, durations and amounts as the document writes them. Do not calculate a duration, total or difference yourself.
+For each proposed change, say what would be different from today when the document says so.
+Name affected groups as specifically as the document does (for example the tenant, a street, a ward), not just "residents".
+unknowns lists specific questions a resident would ask that the document leaves unanswered. Do not add generic or speculative items.
+Do not end or begin a quote with "...".
 Never claim that a proposal is approved unless the source says it is.
 If the PDF is an assessment or a report rather than a proposal, explain its findings without inventing a proposed decision.
 Use empty arrays when a category is not supported. Limit each category to four concise findings.
@@ -108,37 +115,57 @@ def quote_is_on_page(ev: Evidence, normalized_pages: list[str]) -> bool:
     return quote in page or bool(quote_pattern(quote).search(page))
 
 
-def verify_evidence(result: DecisionAnalysis, pages: list[str]) -> int:
-    """Drop every finding that has a quote not found on its cited page.
+def drop_unsupported(result: DecisionAnalysis, pages: list[str]) -> tuple[int, bool]:
+    """Drop every finding and key fact that has a quote not found on its cited page.
 
     A finding is dropped even if its other quotes match: one matching quote
-    must not carry the unsupported half of a statement.
+    must not carry the unsupported half of a statement. A key fact must also
+    show its value inside one of its quotes, so a figure is never retyped.
 
-    Returns the number of findings dropped. Raises if the summary fails the
-    same rule, because the analysis has no trustworthy headline without it.
+    Returns the number of findings dropped and whether the summary passed.
     """
     normalized_pages = [normalize_page(page) for page in pages]
 
-    def supported(finding: Finding) -> bool:
-        unmatched = [ev for ev in finding.evidence if not quote_is_on_page(ev, normalized_pages)]
+    def supported(item: Finding | KeyFact) -> bool:
+        unmatched = [ev for ev in item.evidence if not quote_is_on_page(ev, normalized_pages)]
         for ev in unmatched:
             logger.warning("Unmatched quote on page %s: %r", ev.page, ev.quote[:200])
-        return bool(finding.evidence) and not unmatched
+        return bool(item.evidence) and not unmatched
 
-    if not supported(result.summary):
-        raise ValueError("AI returned a summary quote that could not be matched to the source PDF.")
+    def value_is_quoted(fact: KeyFact) -> bool:
+        value = normalize_quote(fact.value).casefold()
+        # An amount or a date always has a digit; this rejects a place or a name filed as one.
+        quoted = any(char.isdigit() for char in value) and any(value in normalize_quote(ev.quote).casefold() for ev in fact.evidence)
+        if not quoted:
+            logger.warning("Key fact value %r is not in its quote", fact.value[:80])
+        return quoted
 
+    result.key_facts = [fact for fact in result.key_facts if supported(fact) and value_is_quoted(fact)]
     dropped = 0
     for category in FINDING_CATEGORIES:
         findings = getattr(result, category)
         kept = [finding for finding in findings if supported(finding)]
         dropped += len(findings) - len(kept)
         setattr(result, category, kept)
+    return dropped, supported(result.summary)
+
+
+def dropped_note(dropped: int) -> str:
+    return (f"{dropped} AI-generated statement{'s were' if dropped > 1 else ' was'} removed because "
+            "a supporting quote could not be found in the PDF.")
+
+
+def verify_evidence(result: DecisionAnalysis, pages: list[str]) -> int:
+    """Apply drop_unsupported and report it in `unknowns`.
+
+    Returns the number of findings dropped. Raises if the summary is not fully
+    supported, because the analysis has no trustworthy headline without it.
+    """
+    dropped, summary_supported = drop_unsupported(result, pages)
+    if not summary_supported:
+        raise ValueError("AI returned a summary quote that could not be matched to the source PDF.")
     if dropped:
-        result.unknowns.append(
-            f"{dropped} AI-generated statement{'s were' if dropped > 1 else ' was'} removed because "
-            "a supporting quote could not be found in the PDF."
-        )
+        result.unknowns.append(dropped_note(dropped))
     return dropped
 
 

@@ -22,6 +22,7 @@ def analysis_with_participation(quote: str) -> DecisionAnalysis:
         summary=Finding(text="The report discusses consultation.", evidence=[
             Evidence(page=2, quote=quote)
         ]),
+        key_facts=[],
         proposed_changes=[],
         affected_groups=[],
         potential_benefits=[],

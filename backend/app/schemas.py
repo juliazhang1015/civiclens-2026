@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -15,9 +17,18 @@ class Finding(StrictModel):
     evidence: list[Evidence] = Field(min_length=1)
 
 
+class KeyFact(StrictModel):
+    """An amount or date residents should not miss; `value` is copied from the quote."""
+    kind: Literal["amount", "date"]
+    label: str = Field(min_length=1)
+    value: str = Field(min_length=1)
+    evidence: list[Evidence] = Field(min_length=1)
+
+
 class DecisionAnalysis(StrictModel):
     document_title: str = Field(min_length=1)
     summary: Finding
+    key_facts: list[KeyFact]
     proposed_changes: list[Finding]
     affected_groups: list[Finding]
     potential_benefits: list[Finding]
