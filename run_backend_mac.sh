@@ -14,6 +14,6 @@ cd backend
 if [[ -f .env ]]; then
   echo 'backend/.env exists. Keep it out of Git.'
 else
-  echo 'No backend/.env found. Real AI analysis may require OPENAI_API_KEY there.'
+  echo 'No backend/.env found. Default: local Ollama. See backend/.env.example for Ollama or Anthropic configuration.'
 fi
 exec python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
