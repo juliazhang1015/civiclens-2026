@@ -32,3 +32,11 @@ npm run build
 5. Document known limitations in the municipal readiness report.
 
 **Caution:** Exact quote matching alone does not prove correctness; a human reviewer still checks meaning and context.
+
+## Reliability PR verification
+
+- Local Python suite: **19 passed** (includes three synthetic municipal categories through real PDF extraction and SDK parsing with provider HTTP mocked).
+- Local TypeScript/Vite production build: **passed**.
+- Browser regression suite: `cd frontend && npm run test:e2e`. Runs desktop and 390px layouts, upload validation, loading lock, evidence links, response validation, error recovery and cancellation. CI uploads screenshots and traces in `browser-test-results`.
+- Local browser launch was blocked by the execution environment; use the PR CI result for browser-suite status.
+- Live OpenAI analysis: **not run**, no API key available. Official transportation, zoning and facility PDFs: **not yet validated**. Synthetic tests are not a substitute for these acceptance checks.

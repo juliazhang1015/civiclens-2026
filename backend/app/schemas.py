@@ -1,22 +1,26 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class Evidence(BaseModel):
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class Evidence(StrictModel):
     page: int = Field(ge=1)
-    quote: str
+    quote: str = Field(min_length=1)
 
 
-class Finding(BaseModel):
-    text: str
-    evidence: list[Evidence] = Field(default_factory=list)
+class Finding(StrictModel):
+    text: str = Field(min_length=1)
+    evidence: list[Evidence] = Field(min_length=1)
 
 
-class DecisionAnalysis(BaseModel):
-    document_title: str
+class DecisionAnalysis(StrictModel):
+    document_title: str = Field(min_length=1)
     summary: Finding
-    proposed_changes: list[Finding] = Field(default_factory=list)
-    affected_groups: list[Finding] = Field(default_factory=list)
-    potential_benefits: list[Finding] = Field(default_factory=list)
-    potential_tradeoffs: list[Finding] = Field(default_factory=list)
-    participation: list[Finding] = Field(default_factory=list)
-    unknowns: list[str] = Field(default_factory=list)
+    proposed_changes: list[Finding]
+    affected_groups: list[Finding]
+    potential_benefits: list[Finding]
+    potential_tradeoffs: list[Finding]
+    participation: list[Finding]
+    unknowns: list[str]
