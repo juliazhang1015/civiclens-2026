@@ -63,6 +63,7 @@ def test_three_categories_through_api_and_sdk(monkeypatch, text, blank_first):
         assert f"[PDF PAGE {len(pages)}]" in payload["messages"][1]["content"]
         return httpx.Response(200, json={"id": "test", "object": "chat.completion", "created": 0, "model": "gpt-4o-mini",
             "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": expected.model_dump_json()}}]})
+    monkeypatch.setenv("AI_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "test-only")
     monkeypatch.setattr(analyzer, "AsyncOpenAI", lambda **kwargs: AsyncOpenAI(**kwargs, http_client=httpx.AsyncClient(transport=httpx.MockTransport(respond))))
     response = TestClient(app).post("/analyze", files={"file": ("proposal.pdf", content, "application/pdf")})
@@ -74,12 +75,14 @@ def test_three_categories_through_api_and_sdk(monkeypatch, text, blank_first):
 
 
 def test_no_silent_truncation(monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "openai")
     monkeypatch.setenv("OPENAI_API_KEY", "test-only")
     with pytest.raises(ValueError, match="too much text"):
         asyncio.run(analyzer.analyze_pages(["a" * (analyzer.MAX_TEXT_CHARS + 1)]))
 
 
 def test_missing_key(monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "openai")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     response = TestClient(app).post("/analyze", files={"file": ("test.pdf", pdf_bytes("Public proposal"), "application/pdf")})
     assert response.status_code == 503

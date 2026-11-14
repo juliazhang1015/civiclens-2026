@@ -18,9 +18,9 @@ function isDecision(value: unknown): value is Decision {
   const d = value as Decision
   return typeof d.document_title === 'string' && isFinding(d.summary) && categories.every(k => Array.isArray(d[k]) && d[k].every(isFinding)) && Array.isArray(d.unknowns) && d.unknowns.every(s => typeof s === 'string')
 }
-function Findings({ title, items, source, potential = false }: { title: string; items: Finding[]; source: string; potential?: boolean }) {
+function Findings({ title, items, source, potential = false, emptyMessage = "Not identified in the supplied text." }: { title: string; items: Finding[]; source: string; potential?: boolean; emptyMessage?: string }) {
   return <section className={`result-section ${potential ? 'potential' : ''}`}><h3>{title}</h3>
-    {items.length === 0 ? <p className="muted">Not identified in the supplied text.</p> : items.map((item, i) => <div className="finding" key={i}><p>{item.text}</p>
+    {items.length === 0 ? <p className="muted">{emptyMessage}</p> : items.map((item, i) => <div className="finding" key={i}><p>{item.text}</p>
       <details><summary>View supporting excerpts · {item.evidence.length}</summary>
         {item.evidence.map((e, j) => <blockquote className="evidence" key={j}><p>“{e.quote}”</p><a href={`${source}#page=${e.page}`} target="_blank" rel="noreferrer">PDF page {e.page} <ExternalLink size={12}/></a></blockquote>)}
       </details></div>)}
@@ -85,7 +85,7 @@ export default function App() {
         <Findings title="In plain language" items={[result.summary]} source={source}/>
         <div className="section-label">IN THE DOCUMENT <span>Source-based findings · verify the interpretation</span></div><div className="result-grid"><Findings title="What is proposed?" items={result.proposed_changes} source={source}/><Findings title="Who may be affected?" items={result.affected_groups} source={source}/></div>
         <div className="section-label">POTENTIAL IMPACTS <span>Possibilities, not established outcomes</span></div><div className="result-grid"><Findings title="Potential benefits" items={result.potential_benefits} source={source} potential/><Findings title="Potential trade-offs" items={result.potential_tradeoffs} source={source} potential/></div>
-        <Findings title="Participation & next steps" items={result.participation} source={source}/><p className="footnote">Dates in the document may have passed. Confirm current opportunities on the municipality’s official website.</p>
+        <Findings title="Participation & next steps" items={result.participation} source={source} emptyMessage="No currently open participation opportunity is verified by this document. Check the municipality\u2019s official website."/><p className="footnote">Dates in the document may have passed. Confirm current opportunities on the municipality’s official website.</p>
         <section className="result-section"><h3>What remains uncertain?</h3>{result.unknowns.length ? <ul>{result.unknowns.map((s,i) => <li key={i}>{s}</li>)}</ul> : <p className="muted">No additional uncertainties were identified. This does not guarantee completeness.</p>}</section>
       </div>}
     </main><footer><span className="brand"><Building2 size={18}/> CivicScope</span><span>Supporting informed participation · Not an official municipal service</span><span>CIVIC Hack 2026 · Prototype</span></footer>

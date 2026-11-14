@@ -8,7 +8,7 @@ Built for the 2026 CIVIC Hack. This is a hackathon prototype, **not** an officia
 
 1. Upload a text-based municipal PDF (up to 10 MB / 25 pages).
 2. Extract the document's text using PyMuPDF.
-3. Analyze it through a strict Pydantic output schema (when an API key is configured).
+3. Analyze it through a strict Pydantic output schema (local Ollama by default; optional OpenAI API).
 4. Display a plain-language summary, potential impacts, participation details, and supporting PDF page references.
 5. Identify missing or unverified information rather than inventing it.
 
@@ -18,7 +18,7 @@ Built for the 2026 CIVIC Hack. This is a hackathon prototype, **not** an officia
 
 - Frontend: React, TypeScript, Vite
 - Backend: Python, FastAPI, PyMuPDF
-- AI: OpenAI API (optional; server-side only)
+- AI: Ollama local model (default) or optional OpenAI API (server-side only)
 - Storage: no database in MVP; PDF contents are processed in memory
 
 ## Quick start
@@ -33,13 +33,13 @@ python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
-# Add your OPENAI_API_KEY to backend/.env for real AI analysis.
+# Start Ollama and run: ollama pull qwen3:4b (no API key required).
 uvicorn app.main:app --reload
 ```
 
 API docs: http://localhost:8000/docs ; health check: http://localhost:8000/health
 
-Without an API key, the /analyze endpoint returns a clear configuration error, **not fabricated output**.
+If the configured Ollama service/model is missing, /analyze returns a clear configuration error, **not fabricated output**.
 
 ### Frontend
 
@@ -58,7 +58,7 @@ Visit http://localhost:5173 . Vite proxies /api to the backend at localhost:8000
 1. Start both servers.
 2. Upload a real, text-based municipal PDF.
 3. Review the source page number for each extracted claim.
-4. If OPENAI_API_KEY is missing, verify the UI shows an actionable configuration error.
+4. If Ollama is not running, verify the UI shows an actionable configuration error.
 5. Test at least 3 different proposal types (e.g. roads, zoning, public facilities) and record actual vs expected outputs.
 
 ## Repo layout
@@ -94,3 +94,18 @@ No software license has been selected yet. Agree on a license with the team befo
 See [the audit and 36-hour plan](docs/hackathon-plan.md) for priorities, roles, demo script and remaining live validation. Text above 100,000 extracted characters is rejected rather than silently truncated. Quote matching checks source presence, not correctness of interpretation.
 
 For a local demo use both servers above. Production hosting must forward `/api/*` to FastAPI with the `/api` prefix removed; Vite’s development proxy is not part of a static build.
+
+
+## Free local AI and switching computers
+
+The backend defaults to `AI_PROVIDER=ollama`. Install Ollama on the model
+computer and run `ollama pull qwen3:4b`; copy `backend/.env.example` to
+`backend/.env`. No API key is needed for local analysis. Set
+`AI_PROVIDER=openai` and a valid `OPENAI_API_KEY` only if an authorized
+paid provider is intentionally chosen.
+
+The frontend can be on a different laptop than the model computer. See
+[the portable two-computer setup](docs/multi-device-setup.md).
+For a small Mac, keep the supplied 25-page PDF limit and 20,000-character
+local input limit; large original council packets need section extraction
+until chunked analysis is implemented.
