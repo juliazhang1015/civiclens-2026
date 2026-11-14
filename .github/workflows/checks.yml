@@ -31,4 +31,6 @@ jobs:
         if: always()
         with:
           name: browser-test-results
-          path: frontend/test-results/
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
