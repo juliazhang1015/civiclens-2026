@@ -1,8 +1,10 @@
 import asyncio
+import calendar
 import logging
 import os
 import re
 import unicodedata
+from datetime import date
 
 import httpx
 from dotenv import load_dotenv
@@ -156,30 +158,73 @@ FUTURE_OUTREACH = re.compile(
 )
 
 
-def filter_historical_participation(result: DecisionAnalysis) -> None:
-    """Remove next-step findings supported exclusively by completed outreach.
+MONTHS = {name: number for number, names in enumerate([
+    ("January", "Jan"), ("February", "Feb"), ("March", "Mar"), ("April", "Apr"), ("May",), ("June", "Jun"),
+    ("July", "Jul"), ("August", "Aug"), ("September", "Sep", "Sept"), ("October", "Oct"),
+    ("November", "Nov"), ("December", "Dec")], 1) for name in names}
+_MONTH = rf"(?:{'|'.join(sorted(MONTHS, key=len, reverse=True))})\.?"
+_YEAR = r"(?:19|20)\d{2}"
+# Month names are matched capitalised only, so the verb "may" is never a month.
+# A date without a year is not matched: guessing the year could hide a live deadline.
+DATE_MENTION = re.compile(
+    rf"\b(?P<iso_y>{_YEAR})-(?P<iso_m>\d{{2}})-(?P<iso_d>\d{{2}})\b"
+    rf"|\b(?P<dmy_d>\d{{1,2}})(?:st|nd|rd|th)?\s+(?P<dmy_m>{_MONTH}),?\s+(?P<dmy_y>{_YEAR})\b"
+    rf"|\b(?P<mdy_m>{_MONTH})\s+(?P<mdy_d>\d{{1,2}})(?:st|nd|rd|th)?,?\s+(?P<mdy_y>{_YEAR})\b"
+    rf"|\b(?P<my_m>{_MONTH}),?\s+(?P<my_y>{_YEAR})\b"
+)
 
-    Intentionally conservative: mixed or ambiguous evidence is left for human review.
+
+def date_mentions(text: str) -> list[tuple[date, str]]:
+    """Dates written out in the text, with their wording. A month without a day
+    counts as its last day, so "March 2027" is not past until April."""
+    found = []
+    for match in DATE_MENTION.finditer(text):
+        parts = {key.split("_")[1]: value for key, value in match.groupdict().items() if value}
+        month = int(parts["m"]) if parts["m"].isdigit() else MONTHS[parts["m"].rstrip(".")]
+        year = int(parts["y"])
+        try:
+            day = int(parts["d"]) if "d" in parts else calendar.monthrange(year, month)[1]
+            found.append((date(year, month, day), match.group(0)))
+        except ValueError:  # February 30, month 13
+            continue
+    return found
+
+
+def extract_dates(text: str) -> list[date]:
+    return [found for found, _ in date_mentions(text)]
+
+
+def filter_historical_participation(result: DecisionAnalysis, today: date | None = None) -> None:
+    """Remove next-step findings whose opportunity is over.
+
+    Dates in the quotes decide first: a finding whose every date has passed is
+    removed, and one with a date still ahead is kept whatever its wording. Only
+    undated quotes fall back to wording, which stays conservative: mixed or
+    ambiguous evidence is left for human review.
     """
+    today = today or date.today()
     retained = []
-    removed = False
+    notes = []
     for finding in result.participation:
-        historical_only = all(
-            bool(PAST_OUTREACH.search(ev.quote)) and not FUTURE_OUTREACH.search(ev.quote)
-            for ev in finding.evidence
-        )
-        if historical_only:
-            removed = True
+        dated = [(found, label, ev.page) for ev in finding.evidence for found, label in date_mentions(ev.quote)]
+        if dated:
+            latest, label, page = max(dated)
+            if latest >= today:
+                retained.append(finding)
+            else:
+                notes.append(
+                    f"The document mentions a participation step dated {label} (page {page}), which has passed. "
+                    "Check the municipality's official website for current opportunities."
+                )
+        elif all(PAST_OUTREACH.search(ev.quote) and not FUTURE_OUTREACH.search(ev.quote) for ev in finding.evidence):
+            notes.append(
+                "The PDF describes past consultation, but it does not verify a currently "
+                "open participation opportunity. Check the municipality's official website."
+            )
         else:
             retained.append(finding)
-    if removed:
-        result.participation = retained
-        uncertainty = (
-            "The PDF describes past consultation, but it does not verify a currently "
-            "open participation opportunity. Check the municipality's official website."
-        )
-        if uncertainty not in result.unknowns:
-            result.unknowns.append(uncertainty)
+    result.participation = retained
+    result.unknowns.extend(note for note in dict.fromkeys(notes) if note not in result.unknowns)
 
 
 def ai_provider() -> str:
