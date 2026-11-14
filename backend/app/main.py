@@ -4,7 +4,7 @@ from starlette.concurrency import run_in_threadpool
 from openai import APIConnectionError, APIStatusError, APITimeoutError, AuthenticationError, RateLimitError
 
 from .pdf_reader import MAX_FILE_SIZE, extract_pages, PdfError
-from .analyzer import analyze_pages
+from .analyzer import analyze_pages, InputSizeError
 from .schemas import DecisionAnalysis
 
 app = FastAPI(title="CivicScope API", version="0.1.0")
@@ -36,8 +36,11 @@ async def analyze(file: UploadFile = File(...)):
         raise HTTPException(status_code=503, detail="The analysis provider is unavailable. Please try again later.")
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except ValueError as exc:
+    except InputSizeError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except ValueError:
+        # Do not leak arbitrary model/provider validation details to the browser.
+        raise HTTPException(status_code=422, detail="The document could not be analyzed reliably. Please try a shorter, text-based municipal PDF.")
     except Exception:
         # Do not expose API keys, prompts or internal provider responses.
         return JSONResponse(status_code=422, content={"detail": "The document could not be analyzed reliably. Please try a shorter, text-based municipal PDF."})

@@ -43,7 +43,7 @@ def test_ollama_works_without_paid_api_key(monkeypatch):
 def test_ollama_rejects_excessively_long_input_without_silent_truncation(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "ollama")
     monkeypatch.setenv("OLLAMA_MAX_TEXT_CHARS", "10")
-    with pytest.raises(ValueError, match="too much extracted text"):
+    with pytest.raises(ValueError, match="too much text"):
         asyncio.run(analyzer.analyze_pages(["A document containing more than ten characters"]))
 
 
