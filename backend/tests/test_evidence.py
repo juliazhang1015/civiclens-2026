@@ -73,15 +73,25 @@ def test_unmatched_finding_is_dropped_and_the_rest_kept():
     assert any("1 AI-generated statement" in note for note in result.unknowns)
 
 
-def test_finding_keeps_its_matched_quotes_only():
-    mixed = finding("A cycle lane is proposed.", (1, "protected cycle lane"), (1, "Invented quote"), (9, "protected"))
-    result = analysis(proposed_changes=[mixed])
+@pytest.mark.parametrize("bad_quote", [(1, "Parking fees will double"), (9, "protected cycle lane")])
+def test_finding_with_any_unmatched_quote_is_dropped(bad_quote):
+    # One matching quote must not carry the unsupported half of a statement.
+    partly = finding("A cycle lane is proposed and parking fees will double.", (1, "protected cycle lane"), bad_quote)
+    result = analysis(proposed_changes=[partly])
 
-    assert verify_evidence(result, [PAGE]) == 0
-    assert [ev.quote for ev in result.proposed_changes[0].evidence] == ["protected cycle lane"]
-    assert result.unknowns == []
+    assert verify_evidence(result, [PAGE]) == 1
+    assert result.proposed_changes == []
+    assert any("1 AI-generated statement" in note for note in result.unknowns)
 
 
 def test_unsupported_summary_still_rejects_the_whole_analysis():
     with pytest.raises(ValueError):
         verify_evidence(analysis(summary_quote="Invented summary quote"), [PAGE])
+
+
+def test_partly_supported_summary_rejects_the_whole_analysis():
+    result = analysis()
+    result.summary = finding("A cycle lane is proposed and parking fees will double.",
+                             (1, SUMMARY_QUOTE), (1, "Parking fees will double"))
+    with pytest.raises(ValueError):
+        verify_evidence(result, [PAGE])

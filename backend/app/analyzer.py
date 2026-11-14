@@ -107,20 +107,21 @@ def quote_is_on_page(ev: Evidence, normalized_pages: list[str]) -> bool:
 
 
 def verify_evidence(result: DecisionAnalysis, pages: list[str]) -> int:
-    """Keep only quotes found on their cited page; drop findings left with none.
+    """Drop every finding that has a quote not found on its cited page.
 
-    Returns the number of findings dropped. Raises if the summary itself is
-    unsupported, because the analysis has no trustworthy headline without it.
+    A finding is dropped even if its other quotes match: one matching quote
+    must not carry the unsupported half of a statement.
+
+    Returns the number of findings dropped. Raises if the summary fails the
+    same rule, because the analysis has no trustworthy headline without it.
     """
     normalized_pages = [normalize_page(page) for page in pages]
 
     def supported(finding: Finding) -> bool:
-        matched = [ev for ev in finding.evidence if quote_is_on_page(ev, normalized_pages)]
-        for ev in finding.evidence:
-            if ev not in matched:
-                logger.warning("Unmatched quote on page %s: %r", ev.page, ev.quote[:200])
-        finding.evidence = matched
-        return bool(matched)
+        unmatched = [ev for ev in finding.evidence if not quote_is_on_page(ev, normalized_pages)]
+        for ev in unmatched:
+            logger.warning("Unmatched quote on page %s: %r", ev.page, ev.quote[:200])
+        return bool(finding.evidence) and not unmatched
 
     if not supported(result.summary):
         raise ValueError("AI returned a summary quote that could not be matched to the source PDF.")
@@ -134,7 +135,7 @@ def verify_evidence(result: DecisionAnalysis, pages: list[str]) -> int:
     if dropped:
         result.unknowns.append(
             f"{dropped} AI-generated statement{'s were' if dropped > 1 else ' was'} removed because "
-            "the supporting quote could not be found in the PDF."
+            "a supporting quote could not be found in the PDF."
         )
     return dropped
 
