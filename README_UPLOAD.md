@@ -32,9 +32,26 @@ python3 backend/tests/smoke_api.py --pdf demo_samples/waterloo_lease_2pages.pdf
 
 The real AI test **exits with a failure code** on any non-200 HTTP response or missing required JSON fields. `--skip-ai` explicitly reports that AI analysis was not tested. The demo sample is a 2-page excerpt from the Waterloo December 1, 2025 council packet; the original 217-page packet exceeds the 25-page limit.
 
-## Secrets
+## AI Provider Configuration
 
-Set `OPENAI_API_KEY` in your terminal environment before launching, or use `backend/.env` **only if** the backend actually loads dotenv. Never commit or share API keys.
+The default AI provider is Ollama.
+
+### Option 1: Ollama (Default)
+
+The backend uses Ollama by default. Make sure the local Ollama service is running and the required model is available.
+
+### Option 2: OpenAI
+
+To use OpenAI instead of Ollama, configure these environment variables in `backend/.env`:
+
+```env
+AI_PROVIDER=openai
+OPENAI_API_KEY=your_api_key_here
+```
+
+Setting `OPENAI_API_KEY` alone does not switch the provider to OpenAI. You must also set `AI_PROVIDER=openai`.
+
+Never commit `backend/.env` or real API keys to GitHub.
 
 ## Clean up tracked wrong paths and caches
 
