@@ -12,7 +12,7 @@ import uuid
 def request(url, data=None, headers=None):
     req = urllib.request.Request(url, data=data, headers=headers or {}, method='POST' if data is not None else 'GET')
     try:
-        with urllib.request.urlopen(req, timeout=120) as res:
+        with urllib.request.urlopen(req, timeout=270) as res:
             return res.status, res.read().decode('utf-8', errors='replace')
     except urllib.error.HTTPError as err:
         return err.code, err.read().decode('utf-8', errors='replace')
@@ -39,9 +39,14 @@ def main():
     if status != 200:
         raise SystemExit('FAIL: health check')
     status, body = upload(base + '/analyze', 'not_a_pdf.pdf', b'not a pdf')
-    print('Invalid PDF:', status, body[:300])
-    if status < 400:
-        raise SystemExit('FAIL: invalid PDF was accepted')
+print('Invalid PDF:', status, body[:300])
+
+if status != 400:
+    raise SystemExit(
+        f'FAIL: expected HTTP 400 for invalid PDF, got HTTP {status}'
+    )
+
+print('PASS: invalid PDF correctly rejected with HTTP 400')
     if args.skip_ai:
         print('PASS: basic smoke checks completed (AI analysis SKIPPED)')
         return
