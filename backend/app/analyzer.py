@@ -60,15 +60,15 @@ def verify_evidence(result: DecisionAnalysis, pages: list[str]) -> None:
 # Conservative guard for explicitly completed outreach misclassified as next steps.
 # This does NOT determine whether an older announcement is still open today.
 PAST_OUTREACH = re.compile(
-    r"\\b(?:was|were)\\s+(?:made\\s+)?(?:available|distributed|conducted|held|open|completed|closed)\\b"
-    r"|\\b(?:took place|previous survey|past participants|survey results were)\\b",
+    r"\b(?:was|were)\s+(?:made\s+)?(?:available|distributed|conducted|held|open|completed|closed)\b"
+    r"|\b(?:took place|previous survey|past participants|survey results were)\b",
     re.IGNORECASE,
 )
 FUTURE_OUTREACH = re.compile(
-    r"\\b(?:will\\s+(?:open|take place|be available|be held|accept))\\b"
-    r"|\\b(?:is|remains)\\s+open\\b"
-    r"|\\b(?:currently accepting|can submit|may submit|submit comments by|"
-    r"registration is open|upcoming public meeting|scheduled for)\\b",
+    r"\b(?:will\s+(?:open|take place|be available|be held|accept))\b"
+    r"|\b(?:is|remains)\s+open\b"
+    r"|\b(?:currently accepting|can submit|may submit|submit comments by|"
+    r"registration is open|upcoming public meeting|scheduled for)\b",
     re.IGNORECASE,
 )
 
