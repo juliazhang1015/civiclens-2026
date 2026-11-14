@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import unicodedata
 
 import httpx
@@ -26,7 +27,12 @@ Use ONLY the provided numbered PDF text; do not invent dates, effects, URLs, dec
 Distinguish explicit documentary facts from possible impacts: label hypotheses with words like 'may' or 'could'.
 Each substantive finding must include at least one short, exact supporting quote and matching 1-based page number.
 If evidence is insufficient, omit the finding and state the uncertainty in unknowns.
-Participation dates are not necessarily current: explicitly say to verify them on the municipality's official website.
+Participation & next steps means an actual upcoming or open opportunity in the dated document, NOT historical outreach. 
+Phrases such as "a survey was available", "questionnaires were distributed", or "a consultation took place" describe completed participation: do NOT list them as future next steps.
+A PDF from an earlier year cannot verify whether a consultation is open today. Do NOT imply it is ongoing without current confirmation. If there is no explicitly upcoming/open participation action, return an empty participation array and state the uncertainty.
+When participation is explicitly scheduled in the source, describe it as a dated historical-document announcement and tell readers to verify its current status on the municipality's official website.
+Do not invent a trade-off merely to fill that category. State only evidence-supported potential trade-offs.
+Prioritize exact funding amounts, eligibility limits, and decision dates when they materially affect the proposal.
 Never claim that a proposal is approved unless the source says it is.
 If the PDF is an assessment or a report rather than a proposal, explain its findings without inventing a proposed decision.
 Use empty arrays when a category is not supported. Limit each category to four concise findings.
@@ -49,6 +55,48 @@ def verify_evidence(result: DecisionAnalysis, pages: list[str]) -> None:
             if (not normalize_quote(ev.quote) or not 1 <= ev.page <= len(pages)
                     or normalize_quote(ev.quote) not in normalize_quote(pages[ev.page - 1])):
                 raise ValueError("AI returned a quote that could not be matched to the source PDF.")
+
+
+# Conservative guard for explicitly completed outreach misclassified as next steps.
+# This does NOT determine whether an older announcement is still open today.
+PAST_OUTREACH = re.compile(
+    r"\\b(?:was|were)\\s+(?:made\\s+)?(?:available|distributed|conducted|held|open|completed|closed)\\b"
+    r"|\\b(?:took place|previous survey|past participants|survey results were)\\b",
+    re.IGNORECASE,
+)
+FUTURE_OUTREACH = re.compile(
+    r"\\b(?:will\\s+(?:open|take place|be available|be held|accept))\\b"
+    r"|\\b(?:is|remains)\\s+open\\b"
+    r"|\\b(?:currently accepting|can submit|may submit|submit comments by|"
+    r"registration is open|upcoming public meeting|scheduled for)\\b",
+    re.IGNORECASE,
+)
+
+
+def filter_historical_participation(result: DecisionAnalysis) -> None:
+    """Remove next-step findings supported exclusively by completed outreach.
+
+    Intentionally conservative: mixed or ambiguous evidence is left for human review.
+    """
+    retained = []
+    removed = False
+    for finding in result.participation:
+        historical_only = all(
+            bool(PAST_OUTREACH.search(ev.quote)) and not FUTURE_OUTREACH.search(ev.quote)
+            for ev in finding.evidence
+        )
+        if historical_only:
+            removed = True
+        else:
+            retained.append(finding)
+    if removed:
+        result.participation = retained
+        uncertainty = (
+            "The PDF describes past consultation, but it does not verify a currently "
+            "open participation opportunity. Check the municipality's official website."
+        )
+        if uncertainty not in result.unknowns:
+            result.unknowns.append(uncertainty)
 
 
 def ai_provider() -> str:
@@ -135,6 +183,7 @@ async def analyze_pages(pages: list[str]) -> DecisionAnalysis:
         result = await _analyze_with_openai(numbered)
 
     verify_evidence(result, pages)
+    filter_historical_participation(result)
     if any(not page.strip() for page in pages):
         result.unknowns.append(
             "Some PDF pages have no extractable text; images or scanned content on those pages were not analyzed."
